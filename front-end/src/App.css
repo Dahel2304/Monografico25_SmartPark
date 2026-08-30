@@ -1,0 +1,15 @@
+#app-root, .app-root {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: left;
+}
+
+.app-root h1 {
+  margin: 0 0 1rem;
+  font-size: 2rem;
+}
+
+.app-root p {
+  color: #444;
+}

@@ -1,0 +1,60 @@
+package com.parking.controller.reportes;
+
+import java.time.OffsetDateTime;
+
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.parking.dto.ReporteSerieTemporalResponseDTO;
+import com.parking.dto.ReporteTablaResponseDTO;
+import com.parking.service.reportes.OperativosReportService;
+
+@RestController
+@RequestMapping("/reportes/operativos")
+public class ReportesOperativosController {
+
+    private final OperativosReportService operativosReportService;
+
+    public ReportesOperativosController(OperativosReportService operativosReportService) {
+        this.operativosReportService = operativosReportService;
+    }
+
+    @GetMapping("/entradas-por-hora")
+    public ResponseEntity<ReporteSerieTemporalResponseDTO> entradasPorHora(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta,
+            @RequestParam(required = false) Long usuarioId,
+            @RequestParam(required = false) String tipoVehiculo,
+            @RequestParam(required = false) String granularidad) {
+        return ResponseEntity.ok(operativosReportService.obtenerEntradasPorPeriodo(fechaDesde, fechaHasta, usuarioId, tipoVehiculo, granularidad));
+    }
+
+    @GetMapping("/salidas-por-hora")
+    public ResponseEntity<ReporteSerieTemporalResponseDTO> salidasPorHora(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta,
+            @RequestParam(required = false) Long usuarioId,
+            @RequestParam(required = false) String tipoVehiculo,
+            @RequestParam(required = false) String granularidad) {
+        return ResponseEntity.ok(operativosReportService.obtenerSalidasPorPeriodo(fechaDesde, fechaHasta, usuarioId, tipoVehiculo, granularidad));
+    }
+
+    @GetMapping("/tickets-activos")
+    public ResponseEntity<ReporteTablaResponseDTO> ticketsActivos(
+            @RequestParam(required = false) Long usuarioId,
+            @RequestParam(required = false) String tipoVehiculo) {
+        return ResponseEntity.ok(operativosReportService.obtenerTicketsActivosActuales(usuarioId, tipoVehiculo));
+    }
+
+    @GetMapping("/estadias-largas")
+    public ResponseEntity<ReporteTablaResponseDTO> estadiasLargas(
+            @RequestParam(required = false) Integer umbralMinutos,
+            @RequestParam(required = false) Long usuarioId,
+            @RequestParam(required = false) String tipoVehiculo) {
+        return ResponseEntity.ok(operativosReportService.obtenerEstadiasLargas(umbralMinutos, usuarioId, tipoVehiculo));
+    }
+}

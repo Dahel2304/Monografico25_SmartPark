@@ -1,0 +1,99 @@
+import { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Car} from 'lucide-react';
+
+
+export const LoginPage = () => {
+  const { login, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [loading, setLoading] = useState(false);
+
+
+
+  useEffect(() => {
+    if (isAuthenticated) {
+  navigate("/dashboard");
+}
+  }, [isAuthenticated, navigate]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!username || !password) {
+      toast.error("Todos los campos son obligatorios");
+      return;
+    }
+
+    setLoading(true);
+
+   const result = await login(username, password);
+
+    setLoading(false);
+
+    if (result.success) {
+      toast.success("¡Bienvenido!");
+      navigate("/dashboard");
+    } else {
+      toast.error(result.message);
+}
+  };
+
+  return (
+     <div className="app-shell min-h-screen flex items-center justify-center p-4">
+          <Card className="w-full max-w-md border-slate-300/90">
+            <CardHeader className="space-y-1 text-center">
+              <div className="flex justify-center mb-4">
+                  <img className="w-20 h-20" src="icon.png" alt="" />
+              </div>
+              <CardTitle className="text-xl">SmartPark</CardTitle>
+              <CardDescription>
+                Ingrese sus credenciales para acceder al sistema
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="username">Usuario</Label>
+                  <Input
+                    id="username"
+                    type="text"
+                    placeholder="Ingrese su usuario"
+                    value={username}
+                    
+                    onChange={(e) => setUsername(e.target.value)}
+                    autoComplete="username"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Contraseña</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Ingrese su contraseña"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                  />
+                </div>
+    
+    
+                <Button type="submit" className="w-full"
+                  disabled={loading}>
+        {loading ? "Cargando..." : "Ingresar"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+  );
+}

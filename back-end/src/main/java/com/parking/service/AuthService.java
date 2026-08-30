@@ -1,0 +1,63 @@
+package com.parking.service;
+
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+import com.parking.config.JwtUtil;
+import com.parking.dto.LoginRequestDTO;
+import com.parking.dto.LoginResponseDTO;
+import com.parking.dto.MeResponseDTO;
+import com.parking.entity.Usuario;
+import com.parking.repository.UsuarioRepository;
+
+@Service
+public class AuthService {
+
+    private final AuthenticationManager authenticationManager;
+    private final JwtUtil jwtUtil;
+    private final UsuarioRepository usuarioRepository;
+
+    public AuthService(AuthenticationManager authenticationManager,
+                       JwtUtil jwtUtil,
+                       UsuarioRepository usuarioRepository) {
+        this.authenticationManager = authenticationManager;
+        this.jwtUtil = jwtUtil;
+        this.usuarioRepository = usuarioRepository;
+    }
+
+    public LoginResponseDTO login(LoginRequestDTO dto) {
+        // 1. Verifica credenciales — lanza BadCredentialsException si son incorrectas
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(dto.getUsername(), dto.getPassword())
+        );
+
+        // 2. Cargar datos completos del usuario
+        Usuario usuario = usuarioRepository.findByUsernameAndActivoTrueAndEliminadoFalse(dto.getUsername())
+                .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado: " + dto.getUsername()));
+
+
+        // 3. Credenciales correctas → generar token con nombre y rol
+        String token = jwtUtil.generateToken(usuario.getUsername(), usuario.getNombre(), usuario.getRol().getNombre());
+
+        return new LoginResponseDTO(
+                token,
+                usuario.getUsername(),
+                usuario.getNombre(),
+                usuario.getRol().getNombre()
+        );
+    }
+
+    public MeResponseDTO getMe(String username) {
+                Usuario usuario = usuarioRepository.findByUsernameAndActivoTrueAndEliminadoFalse(username)
+                .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado: " + username));
+
+        return new MeResponseDTO(
+                usuario.getUsername(),
+                usuario.getNombre(),
+                usuario.getRol().getNombre()
+        );
+    }
+}
+
