@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { DashboardPage } from "../pages/DashboardPage";
 import { EntradaPage } from "../pages/EntradaPage";
+import { SalidaPage } from "../pages/SalidaPage";
 import  {LoginPage}  from "../pages/LoginPage.jsx";
 import { ReservasPage } from "../pages/ReservasPage";
 import { ConfiguracionPage } from "../pages/ConfiguracionPage";
@@ -23,7 +24,7 @@ export const AppRoutes = () => {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/entrada" element={<EntradaPage />} />
-        <Route path="/salida" element={<Navigate to="/entrada" replace />} />
+        <Route path="/salida" element={<SalidaPage />} />
         <Route path="/espacios" element={<Navigate to="/entrada" replace />} />
         <Route path="/reservas" element={<ReservasPage />} />
         <Route path="/historial" element={<Navigate to="/entrada" replace />} />

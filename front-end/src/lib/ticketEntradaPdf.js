@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import QRCode from "qrcode";
 
 const formatDateTimeForTicket = (value) => {
   if (!value) return "-";
@@ -7,7 +8,7 @@ const formatDateTimeForTicket = (value) => {
   return parsedDate.toLocaleString("es-DO");
 };
 
-export const abrirTicketEntradaPdf = ({ ticketData, empresaTicket }) => {
+export const abrirTicketEntradaPdf = async ({ ticketData, empresaTicket }) => {
   if (!ticketData) {
     return { opened: false, reason: "missing-ticket" };
   }
@@ -18,6 +19,17 @@ export const abrirTicketEntradaPdf = ({ ticketData, empresaTicket }) => {
   const fecha = formatDateTimeForTicket(ticketData.horaEntrada || new Date().toISOString());
   const nombreEmpresa = empresaTicket?.nombre?.trim() || "Parking";
   const telefonoEmpresa = empresaTicket?.telefono?.trim() || "N/A";
+  const contenidoQr = JSON.stringify({
+    codigoTicket: numeroTicket,
+    codigoEspacio: espacio,
+    placa: placaTicket,
+    horaEntrada: ticketData.horaEntrada || new Date().toISOString()
+  });
+  const codigoQr = await QRCode.toDataURL(contenidoQr, {
+    errorCorrectionLevel: "M",
+    margin: 1,
+    width: 160
+  });
 
   const doc = new jsPDF({
     orientation: "portrait",
@@ -66,6 +78,11 @@ export const abrirTicketEntradaPdf = ({ ticketData, empresaTicket }) => {
   doc.setFontSize(11);
   doc.text(String(placaTicket), 8, 68);
 
+  doc.addImage(codigoQr, "PNG", 52, 29, 18, 18);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6);
+  doc.text("Escanee para consultar", 61, 50, { align: "center" });
+
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.text("Fecha y hora", 8, 77);
@@ -94,8 +111,9 @@ export const abrirTicketEntradaPdf = ({ ticketData, empresaTicket }) => {
   setTimeout(() => URL.revokeObjectURL(pdfUrl), 60_000);
 
   if (!visor) {
-    return { opened: false, reason: "popup-blocked" };
+    doc.save(`ticket-entrada-${numeroTicket}.pdf`);
+    return { opened: false, reason: "popup-blocked", qrDataUrl: codigoQr };
   }
 
-  return { opened: true };
+  return { opened: true, qrDataUrl: codigoQr };
 };

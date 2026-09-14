@@ -1,13 +1,13 @@
 
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, Bike, Car, CheckCircle2, CreditCard, Info, RefreshCw, Ticket } from "lucide-react";
+import { Banknote, Bike, Car, CheckCircle2, CreditCard, Info, QrCode, RefreshCw, Ticket } from "lucide-react";
 import toast from "react-hot-toast";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { registrarEntradaVehiculo } from "../api/entradas";
 import { getEmpresa } from "../api/empresa";
 import { getEspacios } from "../api/espacios";
-import { getResumenSalidaPorEspacio, procesarCobroSalida } from "../api/salidas";
+import { getResumenSalidaPorEspacio, getResumenSalidaPorTicket, procesarCobroSalida } from "../api/salidas";
 import { abrirTicketEntradaPdf } from "../lib/ticketEntradaPdf";
 import { abrirFacturaCobroPdf } from "../lib/facturaCobroPdf";
 import { Badge } from "../components/ui/badge";
@@ -55,11 +55,15 @@ const formatDuration = (minutesValue) => {
   return `${remainingMinutes}m`;
 };
 
-export const EntradaPage = () => {
+const normalizeCatalogValue = (value) => String(value || "").trim().toUpperCase();
+
+export const EntradaPage = ({ modo = "entrada" }) => {
+  const esSalida = modo === "salida";
   const location = useLocation();
   const navigate = useNavigate();
   const [espacios, setEspacios] = useState([]);
   const [tipoVehiculo, setTipoVehiculo] = useState("CARRO");
+  const [pisoEntrada, setPisoEntrada] = useState("todos");
   const [espacioSeleccionadoId, setEspacioSeleccionadoId] = useState(null);
   const [placa, setPlaca] = useState("");
   const [placaBloqueada, setPlacaBloqueada] = useState(false);
@@ -75,6 +79,7 @@ export const EntradaPage = () => {
   const [cobroProcesado, setCobroProcesado] = useState(null);
   const [metodoPago, setMetodoPago] = useState("EFECTIVO");
   const [montoRecibido, setMontoRecibido] = useState("");
+  const [codigoQrSalida, setCodigoQrSalida] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [loadingRegistro, setLoadingRegistro] = useState(false);
@@ -118,9 +123,9 @@ export const EntradaPage = () => {
       return;
     }
 
-    const estadoEspacio = (espacioSeleccionado.estado || "").toUpperCase();
+    const estadoEspacio = normalizeCatalogValue(espacioSeleccionado.estado);
     if (estadoEspacio !== "LIBRE" && estadoEspacio !== "RESERVADO") {
-      toast.error("Solo se puede registrar entrada en espacios LIBRES o RESERVADOS");
+      toast.error("Seleccione un espacio LIBRE para registrar la entrada");
       return;
     }
 
@@ -138,14 +143,14 @@ export const EntradaPage = () => {
         espacioId: espacioSeleccionado.id
       });
 
-      setTicketRegistrado(ticket);
       setPlaca("");
       setPlacaBloqueada(false);
       setEspacioSeleccionadoId(null);
-      abrirTicketEntradaPdf({
+      const ticketPdf = await abrirTicketEntradaPdf({
         ticketData: ticket,
         empresaTicket
       });
+      setTicketRegistrado({ ...ticket, codigoQr: ticketPdf.qrDataUrl });
       toast.success("Entrada registrada correctamente");
       await fetchEspacios(false);
     } catch (error) {
@@ -189,6 +194,36 @@ export const EntradaPage = () => {
     }
   };
 
+  const handleBuscarPorQr = async (event) => {
+    event.preventDefault();
+    if (!codigoQrSalida.trim()) {
+      toast.error("Escanee o ingrese el codigo QR del ticket");
+      return;
+    }
+
+    try {
+      setLoadingResumenCobro(true);
+      resetCobroState();
+      let codigoTicket = codigoQrSalida.trim();
+      try {
+        const datosQr = JSON.parse(codigoTicket);
+        codigoTicket = datosQr.codigoTicket || codigoTicket;
+      } catch {
+        // Permite introducir manualmente el codigo del ticket.
+      }
+
+      const resumen = await getResumenSalidaPorTicket(codigoTicket);
+      setSalidaResumen(resumen);
+      setOpenCobroDialog(true);
+      setCodigoQrSalida("");
+    } catch (error) {
+      console.error("Error buscando ticket por QR:", error);
+      toast.error(getErrorMessage(error, "No se encontro un ticket activo con ese codigo"));
+    } finally {
+      setLoadingResumenCobro(false);
+    }
+  };
+
   const handleProcesarCobro = async () => {
     if (!salidaResumen) {
       toast.error("No hay resumen de salida para procesar");
@@ -212,6 +247,7 @@ export const EntradaPage = () => {
       setLoadingProcesarCobro(true);
       const response = await procesarCobroSalida({
         espacioId: salidaResumen.espacioId,
+        codigoTicket: salidaResumen.codigoTicket,
         metodoPago,
         montoRecibido: metodoPago === "EFECTIVO" ? Number(montoRecibido) : null
       });
@@ -240,13 +276,15 @@ export const EntradaPage = () => {
   };
 
   useEffect(() => {
-    fetchEspacios(true);
+    if (!esSalida) {
+      fetchEspacios(true);
+    }
     fetchEmpresaTicket();
-  }, []);
+  }, [esSalida]);
 
   useEffect(() => {
     const prefill = location.state;
-    if (!prefill?.reservaConfirmada) return;
+    if (esSalida || !prefill?.reservaConfirmada) return;
 
     if (prefill.placa) {
       setPlaca(String(prefill.placa).toUpperCase());
@@ -267,25 +305,37 @@ export const EntradaPage = () => {
     });
 
     navigate(location.pathname, { replace: true, state: null });
-  }, [location.pathname, location.state, navigate]);
+  }, [esSalida, location.pathname, location.state, navigate]);
 
   const espaciosCarros = useMemo(
-    () => espacios.filter((e) => e.tipoVehiculo === "CARRO"),
-    [espacios]
+    () => espacios.filter((e) => normalizeCatalogValue(e.tipoVehiculo) === "CARRO"
+      && (pisoEntrada === "todos" || String(e.piso || 1) === pisoEntrada)),
+    [espacios, pisoEntrada]
   );
 
   const espaciosMotos = useMemo(
-    () => espacios.filter((e) => e.tipoVehiculo === "MOTO"),
+    () => espacios.filter((e) => normalizeCatalogValue(e.tipoVehiculo) === "MOTO"
+      && (pisoEntrada === "todos" || String(e.piso || 1) === pisoEntrada)),
+    [espacios, pisoEntrada]
+  );
+
+  const pisosEntrada = useMemo(
+    () => [...new Set(espacios.map((espacio) => Number(espacio.piso || 1)))].sort((a, b) => a - b),
     [espacios]
+  );
+
+  const espaciosVisiblesEntrada = useMemo(
+    () => espacios.filter((espacio) => pisoEntrada === "todos" || String(espacio.piso || 1) === pisoEntrada),
+    [espacios, pisoEntrada]
   );
 
   const stats = useMemo(
     () => ({
-      libre: espacios.filter((e) => e.estado === "LIBRE").length,
-      ocupado: espacios.filter((e) => e.estado === "OCUPADO").length,
-      reservado: espacios.filter((e) => e.estado === "RESERVADO").length
+      libre: espaciosVisiblesEntrada.filter((e) => normalizeCatalogValue(e.estado) === "LIBRE").length,
+      ocupado: espaciosVisiblesEntrada.filter((e) => normalizeCatalogValue(e.estado) === "OCUPADO").length,
+      reservado: espaciosVisiblesEntrada.filter((e) => normalizeCatalogValue(e.estado) === "RESERVADO").length
     }),
-    [espacios]
+    [espaciosVisiblesEntrada]
   );
 
   const renderEspacios = (lista) => {
@@ -305,7 +355,10 @@ export const EntradaPage = () => {
             role="button"
             tabIndex={0}
             onClick={() => {
-              if ((space.estado || "").toUpperCase() === "LIBRE" && space.tipoVehiculo === tipoVehiculo) {
+              if (
+                normalizeCatalogValue(space.estado) === "LIBRE"
+                && normalizeCatalogValue(space.tipoVehiculo) === normalizeCatalogValue(tipoVehiculo)
+              ) {
                 setEspacioSeleccionadoId(space.id);
               }
             }}
@@ -313,7 +366,10 @@ export const EntradaPage = () => {
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
-                if ((space.estado || "").toUpperCase() === "LIBRE" && space.tipoVehiculo === tipoVehiculo) {
+                if (
+                  normalizeCatalogValue(space.estado) === "LIBRE"
+                  && normalizeCatalogValue(space.tipoVehiculo) === normalizeCatalogValue(tipoVehiculo)
+                ) {
                   setEspacioSeleccionadoId(space.id);
                 }
               }
@@ -350,21 +406,25 @@ export const EntradaPage = () => {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Panel de Entradas y Salidas</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {esSalida ? "Registrar salida" : "Registrar entrada"}
+          </h1>
         </div>
 
-        <Button
-          variant="outline"
-          onClick={() => fetchEspacios(true)}
-          disabled={loading}
-        >
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Actualizar
-        </Button>
+        {!esSalida && (
+          <Button
+            variant="outline"
+            onClick={() => fetchEspacios(true)}
+            disabled={loading}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Actualizar
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <Card>
+          <Card className={esSalida ? "hidden" : ""}>
           <CardHeader className="pb-3" />
 
           <CardContent>
@@ -377,6 +437,21 @@ export const EntradaPage = () => {
               className="space-y-4"
             >
               <div className="flex flex-wrap items-center gap-2">
+                <label htmlFor="piso-entrada" className="text-sm font-medium">Piso:</label>
+                <select
+                  id="piso-entrada"
+                  value={pisoEntrada}
+                  onChange={(event) => {
+                    setPisoEntrada(event.target.value);
+                    setEspacioSeleccionadoId(null);
+                  }}
+                  className="h-9 rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="todos">Todos los pisos</option>
+                  {pisosEntrada.map((piso) => (
+                    <option key={piso} value={piso}>Piso {piso}</option>
+                  ))}
+                </select>
                 <Badge variant="outline" className="border-emerald-300 text-emerald-700 bg-emerald-50">
                   Libres: {stats.libre}
                 </Badge>
@@ -433,7 +508,7 @@ export const EntradaPage = () => {
           </CardContent>
         </Card>
 
-        <Card className="h-fit">
+        <Card className={`h-fit ${esSalida ? "hidden" : ""}`}>
           <CardHeader>
             <CardTitle className="text-base">Registrar Entrada</CardTitle>
           </CardHeader>
@@ -448,8 +523,12 @@ export const EntradaPage = () => {
                   onChange={(e) => setPlaca(e.target.value.toUpperCase())}
                   placeholder="ABC123"
                   autoComplete="off"
+                  required
                   disabled={placaBloqueada}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Escriba la placa y seleccione un parqueo verde antes de registrar.
+                </p>
               </div>
 
               <div className="rounded-lg border bg-muted/20 p-3 text-sm">
@@ -459,13 +538,18 @@ export const EntradaPage = () => {
                     ? espacios.find((e) => e.id === espacioSeleccionadoId)?.codigoEspacio
                     : "Ninguno"}
                 </p>
+                <p className="text-xs text-muted-foreground">
+                  Piso: {espacioSeleccionadoId
+                    ? espacios.find((e) => e.id === espacioSeleccionadoId)?.piso || 1
+                    : "-"}
+                </p>
                 <p className="text-xs text-muted-foreground mt-1">Tipo: {tipoVehiculo}</p>
               </div>
 
               <Button
                 type="submit"
                 className="w-full"
-                disabled={loadingRegistro || !espacioSeleccionadoId || !placa.trim()}
+                disabled={loadingRegistro || !espacioSeleccionadoId}
               >
                 <Ticket className="mr-2 h-4 w-4" />
                 {loadingRegistro ? "Registrando..." : "Registrar Entrada"}
@@ -478,11 +562,45 @@ export const EntradaPage = () => {
                 <p><strong>Ticket:</strong> {ticketRegistrado.codigoTicket}</p>
                 <p><strong>Placa:</strong> {ticketRegistrado.placa}</p>
                 <p><strong>Espacio:</strong> {ticketRegistrado.codigoEspacio}</p>
+                <p><strong>Hora de entrada:</strong> {formatDateTime(ticketRegistrado.horaEntrada)}</p>
+                {ticketRegistrado.codigoQr && (
+                  <div className="flex justify-center pt-2">
+                    <img
+                      src={ticketRegistrado.codigoQr}
+                      alt={`Codigo QR del ticket ${ticketRegistrado.codigoTicket}`}
+                      className="h-36 w-36 rounded border bg-white p-2"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
           </CardContent>
         </Card>
+
+        {esSalida && (
+          <Card className="h-fit lg:col-span-2 lg:col-start-1">
+            <CardHeader>
+              <CardTitle className="text-base">Salida por codigo QR</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleBuscarPorQr} className="space-y-3">
+                <Label htmlFor="codigo-qr-salida">Codigo del ticket</Label>
+                <Input
+                  id="codigo-qr-salida"
+                  value={codigoQrSalida}
+                  onChange={(event) => setCodigoQrSalida(event.target.value)}
+                  placeholder="Escanee el codigo QR"
+                  autoComplete="off"
+                />
+                <Button type="submit" className="w-full" disabled={loadingResumenCobro}>
+                  <QrCode className="mr-2 h-4 w-4" />
+                  {loadingResumenCobro ? "Buscando..." : "Recibir QR y calcular tiempo"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Dialog open={openDetalleDialog} onOpenChange={setOpenDetalleDialog}>

@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 export default function AddEspaciosDialog({ open, onClose, onSave }) {
   const [carros, setCarros] = useState(0);
   const [motos, setMotos] = useState(0);
+  const [piso, setPiso] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -22,6 +23,7 @@ export default function AddEspaciosDialog({ open, onClose, onSave }) {
 
     const carrosNum = Number(carros);
     const motosNum = Number(motos);
+    const pisoNum = Number(piso);
 
     if (carrosNum < 0 || motosNum < 0) {
       setError("Las cantidades deben ser mayores o iguales a 0");
@@ -33,16 +35,23 @@ export default function AddEspaciosDialog({ open, onClose, onSave }) {
       return;
     }
 
+    if (!Number.isInteger(pisoNum) || pisoNum < 1) {
+      setError("El piso debe ser un numero mayor que 0");
+      return;
+    }
+
     try {
       setLoading(true);
 
       await onSave({
         cantidadCarros: carrosNum,
         cantidadMotos: motosNum,
+        piso: pisoNum,
       });
 
       setCarros(0);
       setMotos(0);
+      setPiso(1);
 
       onClose();
     } catch (err) {
@@ -60,6 +69,16 @@ export default function AddEspaciosDialog({ open, onClose, onSave }) {
         </DialogHeader>
 
         <div className="space-y-4">
+
+          <div>
+            <Label>Piso del edificio</Label>
+            <Input
+              type="number"
+              min="1"
+              value={piso}
+              onChange={(e) => setPiso(e.target.value)}
+            />
+          </div>
 
           <div>
             <Label>Espacios para carros</Label>

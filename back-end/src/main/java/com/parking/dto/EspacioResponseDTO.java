@@ -11,6 +11,7 @@ public class EspacioResponseDTO {
 
     private Long id;
     private String codigoEspacio;
+    private Integer piso;
     private String tipoVehiculo;
     private String estado;
     private TicketActivoDTO ticketActivo;

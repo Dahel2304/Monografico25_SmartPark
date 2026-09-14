@@ -21,6 +21,11 @@ export const updateEstadoEspacio = async (id, estado) => {
   }
 };
 
+export const updateEspacio = async (id, payload) => {
+  const { data } = await client.put(`/espacios/${id}`, payload);
+  return data;
+};
+
 export const addEspaciosLote = async (data) => {
   try {
     const response = await client.post("/espacios/lote", data);

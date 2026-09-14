@@ -8,6 +8,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.parking.dto.AddEspaciosLoteDTO;
 import com.parking.dto.EspacioResponseDTO;
+import com.parking.dto.UpdateEspacioDTO;
 import com.parking.dto.ReservaActivaDTO;
 import com.parking.dto.TicketActivoDTO;
 import com.parking.entity.Espacio;
@@ -51,6 +54,30 @@ public class EspacioService {
         this.reservaRepository = reservaRepository;
         this.tipoVehiculoRepository = tipoVehiculoRepository;
         this.estadoEspacioRepository = estadoEspacioRepository;
+    }
+
+    @Transactional
+    public void migrarCodigosLegacy() {
+        List<Espacio> espacios = espacioRepository.findAll();
+        Set<String> codigosExistentes = new HashSet<>();
+
+        for (Espacio espacio : espacios) {
+            String codigoActual = normalizarCodigo(espacio.getCodigoEspacio());
+            if (codigoActual.matches("[CM]-\\d+")) {
+                String tipo = espacio.getTipoVehiculo() == null ? "CARRO" : espacio.getTipoVehiculo().getNombre();
+                String prefijo = "CARRO".equalsIgnoreCase(tipo) ? "CP" : "MP";
+                int numero = Integer.parseInt(codigoActual.substring(2));
+                int piso = espacio.getPiso() == null ? 1 : espacio.getPiso();
+                String nuevoCodigo = generarCodigo(prefijo, piso, numero);
+                if (!codigosExistentes.contains(nuevoCodigo)) {
+                    espacio.setCodigoEspacio(nuevoCodigo);
+                    espacio.setPiso(piso);
+                    espacioRepository.save(espacio);
+                    codigoActual = nuevoCodigo;
+                }
+            }
+            codigosExistentes.add(codigoActual);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -111,6 +138,27 @@ public class EspacioService {
     }
 
     @Transactional
+    public EspacioResponseDTO actualizarEspacio(Long id, UpdateEspacioDTO dto) {
+        Espacio espacio = espacioRepository.findByIdAndActivoTrue(id)
+                .orElseThrow(() -> new NoSuchElementException("Espacio no encontrado o inactivo"));
+        String estadoActual = espacio.getEstado().getNombre();
+        boolean ocupado = "OCUPADO".equalsIgnoreCase(estadoActual);
+        if (ocupado && !espacio.getTipoVehiculo().getNombre().equalsIgnoreCase(dto.getTipoVehiculo())) {
+            throw new IllegalStateException("No se puede cambiar el tipo de un espacio ocupado");
+        }
+
+        EstadoEspacio estado = estadoEspacioRepository.findByNombreIgnoreCase(dto.getEstado().trim())
+                .orElseThrow(() -> new NoSuchElementException("Estado de espacio no existe"));
+        TipoVehiculo tipo = tipoVehiculoRepository.findByNombreIgnoreCase(dto.getTipoVehiculo().trim())
+                .orElseThrow(() -> new NoSuchElementException("Tipo de vehiculo no existe"));
+        espacio.setCodigoEspacio(dto.getCodigoEspacio().trim().toUpperCase(Locale.ROOT));
+        espacio.setTipoVehiculo(tipo);
+        espacio.setEstado(estado);
+        espacio.setPiso(dto.getPiso());
+        return toDto(espacioRepository.save(espacio), null, null);
+    }
+
+    @Transactional
     public List<EspacioResponseDTO> agregarLote(AddEspaciosLoteDTO dto) {
 
         int cantidadCarros = dto.getCantidadCarros();
@@ -125,14 +173,20 @@ public class EspacioService {
 
         List<Espacio> nuevos = new ArrayList<>();
 
-        int nextCarro = obtenerSiguienteNumero("C");
+        String prefijoCarro = "CP" + dto.getPiso();
+        Set<Integer> numerosCarro = obtenerNumerosOcupados(prefijoCarro);
         for (int i = 0; i < cantidadCarros; i++) {
-            nuevos.add(crearEspacio(tipoCarro, estadoLibre, "C", nextCarro + i));
+            int numero = obtenerPrimerNumeroDisponible(numerosCarro);
+            nuevos.add(crearEspacio(tipoCarro, estadoLibre, "CP", numero, dto.getPiso()));
+            numerosCarro.add(numero);
         }
 
-        int nextMoto = obtenerSiguienteNumero("M");
+        String prefijoMoto = "MP" + dto.getPiso();
+        Set<Integer> numerosMoto = obtenerNumerosOcupados(prefijoMoto);
         for (int i = 0; i < cantidadMotos; i++) {
-            nuevos.add(crearEspacio(tipoMoto, estadoLibre, "M", nextMoto + i));
+            int numero = obtenerPrimerNumeroDisponible(numerosMoto);
+            nuevos.add(crearEspacio(tipoMoto, estadoLibre, "MP", numero, dto.getPiso()));
+            numerosMoto.add(numero);
         }
 
         List<Espacio> guardados = espacioRepository.saveAll(nuevos);
@@ -211,34 +265,40 @@ public class EspacioService {
         return reservaPorEspacio;
     }
 
-    private Espacio crearEspacio(TipoVehiculo tipoVehiculo, EstadoEspacio estadoLibre, String prefijo, int correlativo) {
+    private Espacio crearEspacio(TipoVehiculo tipoVehiculo, EstadoEspacio estadoLibre, String prefijo, int correlativo, Integer piso) {
 
         Espacio espacio = new Espacio();
-        espacio.setCodigoEspacio(generarCodigo(prefijo, correlativo));
+        espacio.setCodigoEspacio(generarCodigo(prefijo, piso, correlativo));
+        espacio.setPiso(piso);
         espacio.setTipoVehiculo(tipoVehiculo);
         espacio.setEstado(estadoLibre);
         espacio.setActivo(true);
         return espacio;
     }
 
-    private int obtenerSiguienteNumero(String prefijo) {
+    private Set<Integer> obtenerNumerosOcupados(String prefijo) {
 
         List<Espacio> existentes = espacioRepository.findByCodigoEspacioStartingWith(prefijo + "-");
         Pattern pattern = Pattern.compile("^" + prefijo + "-(\\d+)$");
+        Set<Integer> ocupados = new HashSet<>();
 
-        int max = 0;
         for (Espacio espacio : existentes) {
             String codigo = normalizarCodigo(espacio.getCodigoEspacio());
             Matcher matcher = pattern.matcher(codigo);
             if (matcher.matches()) {
-                int numero = Integer.parseInt(matcher.group(1));
-                if (numero > max) {
-                    max = numero;
-                }
+                ocupados.add(Integer.parseInt(matcher.group(1)));
             }
         }
 
-        return max + 1;
+        return ocupados;
+    }
+
+    private int obtenerPrimerNumeroDisponible(Set<Integer> ocupados) {
+        int numero = 1;
+        while (ocupados.contains(numero)) {
+            numero++;
+        }
+        return numero;
     }
 
     private String normalizarCodigo(String codigo) {
@@ -249,8 +309,8 @@ public class EspacioService {
         return codigo.trim().toUpperCase(Locale.ROOT);
     }
 
-    private String generarCodigo(String prefijo, int correlativo) {
-        return String.format("%s-%03d", prefijo, correlativo);
+    private String generarCodigo(String prefijo, int piso, int correlativo) {
+        return String.format("%s%d-%03d", prefijo, piso, correlativo);
     }
 
     private EspacioResponseDTO toDto(Espacio espacio, Ticket ticketActivo, Reserva reservaActiva) {
@@ -278,6 +338,7 @@ public class EspacioService {
         return new EspacioResponseDTO(
                 espacio.getId(),
                 espacio.getCodigoEspacio(),
+            espacio.getPiso() == null ? 1 : espacio.getPiso(),
                 espacio.getTipoVehiculo().getNombre(),
                 espacio.getEstado().getNombre(),
             ticketActivoDTO,

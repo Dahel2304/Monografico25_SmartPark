@@ -89,6 +89,27 @@ public class SalidaService {
                 .orElseThrow(() -> new NoSuchElementException("Espacio no encontrado o inactivo"));
 
         Ticket ticket = obtenerTicketActivoPorEspacio(espacio.getId());
+        return construirResumen(espacio, ticket);
+    }
+
+    @Transactional(readOnly = true)
+    public SalidaResumenDTO obtenerResumenPorCodigoTicket(String codigoTicket) {
+        String codigoNormalizado = normalize(codigoTicket);
+        if (codigoNormalizado.isBlank()) {
+            throw new IllegalArgumentException("El codigo QR es obligatorio");
+        }
+
+        Ticket ticket = ticketRepository.findByCodigoTicketIgnoreCase(codigoNormalizado)
+                .orElseThrow(() -> new NoSuchElementException("Ticket no encontrado"));
+        Espacio espacio = ticket.getEspacio();
+        if (espacio == null || !Boolean.TRUE.equals(espacio.getActivo())) {
+            throw new NoSuchElementException("El espacio asociado no esta disponible");
+        }
+
+        return construirResumen(espacio, ticket);
+    }
+
+    private SalidaResumenDTO construirResumen(Espacio espacio, Ticket ticket) {
         ResumenCalculo calculo = calcularMonto(ticket, LocalDateTime.now(appClock));
 
         return new SalidaResumenDTO(
@@ -104,10 +125,28 @@ public class SalidaService {
 
     @Transactional
     public SalidaCobroResponseDTO procesarCobro(SalidaCobroDTO dto) {
-        Espacio espacio = espacioRepository.findByIdAndActivoTrue(dto.getEspacioId())
-                .orElseThrow(() -> new NoSuchElementException("Espacio no encontrado o inactivo"));
+        Espacio espacio;
+        if (dto.getCodigoTicket() != null && !normalize(dto.getCodigoTicket()).isBlank()) {
+            Ticket ticketPorCodigo = ticketRepository.findByCodigoTicketIgnoreCase(normalize(dto.getCodigoTicket()))
+                    .orElseThrow(() -> new NoSuchElementException("Ticket no encontrado"));
+            espacio = ticketPorCodigo.getEspacio();
+        } else if (dto.getEspacioId() != null) {
+            espacio = espacioRepository.findByIdAndActivoTrue(dto.getEspacioId())
+                    .orElseThrow(() -> new NoSuchElementException("Espacio no encontrado o inactivo"));
+        } else {
+            throw new IllegalArgumentException("El codigo de ticket o el id del espacio es requerido");
+        }
+
+        if (espacio == null || !Boolean.TRUE.equals(espacio.getActivo())) {
+            throw new NoSuchElementException("Espacio no encontrado o inactivo");
+        }
 
         Ticket ticket = obtenerTicketActivoPorEspacio(espacio.getId());
+        if (dto.getCodigoTicket() != null
+                && !normalize(dto.getCodigoTicket()).isBlank()
+                && !ticket.getCodigoTicket().equalsIgnoreCase(normalize(dto.getCodigoTicket()))) {
+            throw new IllegalArgumentException("El codigo QR no corresponde al ticket activo del espacio");
+        }
         LocalDateTime horaSalida = LocalDateTime.now(appClock);
         ResumenCalculo calculo = calcularMonto(ticket, horaSalida);
 

@@ -24,7 +24,8 @@ import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 
 const menuItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "operador"] },
-  { path: "/entrada", label: "Entradas y Salidas", icon: LogIn, roles: ["admin", "operador"] },
+  { path: "/entrada", label: "Entrada", icon: LogIn, roles: ["admin", "operador"] },
+  { path: "/salida", label: "Salida", icon: LogOut, roles: ["admin", "operador"] },
   { path: "/reservas", label: "Reservas", icon: Calendar, roles: ["admin", "operador"] },
   {
     path: "/reportes",
