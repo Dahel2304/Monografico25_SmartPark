@@ -1,4 +1,4 @@
-import { Layers3, PlusCircle } from "lucide-react";
+import { Layers3, Pencil, PlusCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -9,10 +9,13 @@ import {
   getEspacios,
   getEspaciosInactivos,
   reactivarEspacio
+  ,updateEspacio
 } from "../../api/espacios";
 import AddEspaciosDialog from "../espacios/AddEspaciosDialog";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import {
   Dialog,
@@ -37,6 +40,10 @@ export const EspaciosSection = () => {
   const [espacioPendiente, setEspacioPendiente] = useState(null);
   const [openEliminarDialog, setOpenEliminarDialog] = useState(false);
   const [espacioEliminar, setEspacioEliminar] = useState(null);
+  const [pisoFiltro, setPisoFiltro] = useState("todos");
+  const [openEditarDialog, setOpenEditarDialog] = useState(false);
+  const [espacioEditar, setEspacioEditar] = useState(null);
+  const [editForm, setEditForm] = useState({ codigoEspacio: "", tipoVehiculo: "CARRO", estado: "LIBRE", piso: 1 });
 
   const fetchEspacios = async () => {
     try {
@@ -68,6 +75,33 @@ export const EspaciosSection = () => {
       const message = error?.response?.data?.message || "No se pudieron agregar espacios";
       toast.error(message);
       throw error;
+    }
+  };
+
+  const handleOpenEditar = (espacio) => {
+    setEspacioEditar(espacio);
+    setEditForm({
+      codigoEspacio: espacio.codigoEspacio || "",
+      tipoVehiculo: String(espacio.tipoVehiculo || "CARRO").toUpperCase(),
+      estado: String(espacio.estado || "LIBRE").toUpperCase(),
+      piso: espacio.piso || 1
+    });
+    setOpenEditarDialog(true);
+  };
+
+  const handleGuardarEdicion = async () => {
+    if (!espacioEditar) return;
+    try {
+      setLoadingActionId(espacioEditar.id);
+      await updateEspacio(espacioEditar.id, { ...editForm, piso: Number(editForm.piso) });
+      toast.success("Espacio actualizado correctamente");
+      setOpenEditarDialog(false);
+      setEspacioEditar(null);
+      await fetchEspacios();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "No se pudo actualizar el espacio");
+    } finally {
+      setLoadingActionId(null);
     }
   };
 
@@ -144,24 +178,33 @@ export const EspaciosSection = () => {
   }, [espacios, espaciosInactivos, espaciosCombinados]);
 
   const espaciosFiltrados = useMemo(() => {
+    const porPiso = (lista) => pisoFiltro === "todos"
+      ? lista
+      : lista.filter((e) => String(e.piso || 1) === pisoFiltro);
+
     if (categoria === "carros") {
-      return espaciosCombinados.filter((e) => String(e.tipoVehiculo || "").toUpperCase() === "CARRO");
+      return porPiso(espaciosCombinados.filter((e) => String(e.tipoVehiculo || "").toUpperCase() === "CARRO"));
     }
 
     if (categoria === "motos") {
-      return espaciosCombinados.filter((e) => String(e.tipoVehiculo || "").toUpperCase() === "MOTO");
+      return porPiso(espaciosCombinados.filter((e) => String(e.tipoVehiculo || "").toUpperCase() === "MOTO"));
     }
 
     if (categoria === "libres") {
-      return espacios.filter((e) => String(e.estado || "").toUpperCase() === "LIBRE");
+      return porPiso(espacios.filter((e) => String(e.estado || "").toUpperCase() === "LIBRE"));
     }
 
     if (categoria === "inactivos") {
-      return espaciosInactivos;
+      return porPiso(espaciosInactivos);
     }
 
-    return espaciosCombinados;
-  }, [categoria, espaciosCombinados, espacios, espaciosInactivos]);
+    return porPiso(espaciosCombinados);
+  }, [categoria, pisoFiltro, espaciosCombinados, espacios, espaciosInactivos]);
+
+  const pisos = useMemo(
+    () => [...new Set(espaciosCombinados.map((espacio) => Number(espacio.piso || 1)))].sort((a, b) => a - b),
+    [espaciosCombinados]
+  );
 
   const espaciosInactivosIds = useMemo(() => new Set(espaciosInactivos.map((e) => e.id)), [espaciosInactivos]);
 
@@ -261,10 +304,24 @@ export const EspaciosSection = () => {
             </Badge>
           </div>
 
+          <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 p-3">
+            <Label htmlFor="piso-filtro" className="text-sm font-medium">Piso:</Label>
+            <select
+              id="piso-filtro"
+              value={pisoFiltro}
+              onChange={(event) => { setPisoFiltro(event.target.value); setPage(1); }}
+              className="h-9 rounded-md border bg-background px-3 text-sm"
+            >
+              <option value="todos">Todos los pisos</option>
+              {pisos.map((piso) => <option key={piso} value={piso}>Piso {piso}</option>)}
+            </select>
+          </div>
+
           <Table className="text-xs">
             <TableHeader>
               <TableRow>
                 <TableHead className="h-9 px-2">Código</TableHead>
+                <TableHead className="h-9 px-2">Piso</TableHead>
                 <TableHead className="h-9 px-2">Tipo</TableHead>
                 <TableHead className="h-9 px-2">Estado</TableHead>
                 <TableHead className="h-9 px-2">Activo</TableHead>
@@ -274,13 +331,13 @@ export const EspaciosSection = () => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-6 text-center text-xs text-muted-foreground">
+                  <TableCell colSpan={6} className="py-6 text-center text-xs text-muted-foreground">
                     Cargando espacios...
                   </TableCell>
                 </TableRow>
                 ) : !espaciosFiltrados.length ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-6 text-center text-xs text-muted-foreground">
+                  <TableCell colSpan={6} className="py-6 text-center text-xs text-muted-foreground">
                     No hay espacios registrados.
                   </TableCell>
                 </TableRow>
@@ -290,6 +347,7 @@ export const EspaciosSection = () => {
                   return (
                     <TableRow key={espacio.id}>
                       <TableCell className="px-2 py-2 font-medium">{espacio.codigoEspacio || espacio.numero || "-"}</TableCell>
+                      <TableCell className="px-2 py-2">Piso {espacio.piso || 1}</TableCell>
                       <TableCell className="px-2 py-2">{espacio.tipoVehiculo || "-"}</TableCell>
                       <TableCell className="px-2 py-2">
                         <Badge variant="outline" className={getEstadoStyle(espacio.estado)}>
@@ -313,6 +371,9 @@ export const EspaciosSection = () => {
                             onClick={() => (activo ? handleOpenDesactivar(espacio) : handleReactivar(espacio))}
                           >
                             {loadingActionId === espacio.id ? "Procesando..." : activo ? "Desactivar" : "Reactivar"}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => handleOpenEditar(espacio)}>
+                            <Pencil className="mr-1 h-3.5 w-3.5" /> Editar
                           </Button>
                           {!activo && (
                             <Button
@@ -367,6 +428,51 @@ export const EspaciosSection = () => {
         onClose={() => setOpenAddDialog(false)}
         onSave={handleAgregarLote}
       />
+
+      <Dialog open={openEditarDialog} onOpenChange={setOpenEditarDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar espacio</DialogTitle>
+            <DialogDescription>
+              Modifica la ubicación, tipo y estado operativo del parqueo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="editar-codigo">Código</Label>
+              <Input id="editar-codigo" value={editForm.codigoEspacio} onChange={(event) => setEditForm({ ...editForm, codigoEspacio: event.target.value.toUpperCase() })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="editar-piso">Piso</Label>
+                <Input id="editar-piso" type="number" min="1" value={editForm.piso} onChange={(event) => setEditForm({ ...editForm, piso: event.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editar-tipo">Tipo</Label>
+                <select id="editar-tipo" value={editForm.tipoVehiculo} onChange={(event) => setEditForm({ ...editForm, tipoVehiculo: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                  <option value="CARRO">Carro</option>
+                  <option value="MOTO">Moto</option>
+                </select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editar-estado">Estado</Label>
+              <select id="editar-estado" value={editForm.estado} onChange={(event) => setEditForm({ ...editForm, estado: event.target.value })} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+                <option value="LIBRE">Libre</option>
+                <option value="OCUPADO">Ocupado</option>
+                <option value="RESERVADO">Reservado</option>
+                <option value="MANTENIMIENTO">Mantenimiento</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenEditarDialog(false)}>Cancelar</Button>
+            <Button onClick={handleGuardarEdicion} disabled={!espacioEditar || loadingActionId === espacioEditar?.id}>
+              {loadingActionId === espacioEditar?.id ? "Guardando..." : "Guardar cambios"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={openDesactivarDialog} onOpenChange={setOpenDesactivarDialog}>
         <DialogContent>

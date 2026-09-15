@@ -44,7 +44,8 @@ git config --global user.email "tuemail@ejemplo.com"
 ```bash
 cd Desktop
 git clone <URL-DEL-REPOSITORIO>
-cd parking-system
+cd Monografico25_SmartPark
+
 ```
 
 ### 4. Verificar rama actual

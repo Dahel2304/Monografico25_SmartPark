@@ -35,6 +35,11 @@ public class SalidaController {
         return ResponseEntity.ok(salidaService.obtenerResumen(espacioId));
     }
 
+    @GetMapping("/ticket/{codigoTicket}/resumen")
+    public ResponseEntity<SalidaResumenDTO> obtenerResumenPorTicket(@PathVariable String codigoTicket) {
+        return ResponseEntity.ok(salidaService.obtenerResumenPorCodigoTicket(codigoTicket));
+    }
+
     @PostMapping("/cobro")
     public ResponseEntity<SalidaCobroResponseDTO> procesarCobro(@Valid @RequestBody SalidaCobroDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(salidaService.procesarCobro(dto));

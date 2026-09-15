@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.parking.dto.AddEspaciosLoteDTO;
 import com.parking.dto.EspacioResponseDTO;
 import com.parking.dto.UpdateEstadoEspacioDTO;
+import com.parking.dto.UpdateEspacioDTO;
 import com.parking.service.EspacioService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -50,6 +51,13 @@ public class EspacioController {
 			@Valid @RequestBody UpdateEstadoEspacioDTO dto) {
 		EspacioResponseDTO response = espacioService.actualizarEstado(id, dto.getEstado());
 		return ResponseEntity.ok(response);
+	}
+
+	@org.springframework.web.bind.annotation.PutMapping("/{id}")
+	public ResponseEntity<EspacioResponseDTO> actualizarEspacio(
+			@PathVariable @Positive(message = "El id debe ser mayor a 0") Long id,
+			@Valid @RequestBody UpdateEspacioDTO dto) {
+		return ResponseEntity.ok(espacioService.actualizarEspacio(id, dto));
 	}
 
 	@PostMapping("/lote")

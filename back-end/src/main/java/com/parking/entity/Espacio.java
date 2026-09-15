@@ -34,6 +34,9 @@ public class Espacio {
     @NotNull
     @Column(name = "codigo_espacio", nullable = false, unique = true, length = 30)
     private String codigoEspacio;
+
+    @Column(nullable = true)
+    private Integer piso = 1;
     
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "tipo_vehiculo_id", nullable = false)

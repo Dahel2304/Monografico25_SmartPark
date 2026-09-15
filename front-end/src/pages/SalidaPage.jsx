@@ -1,11 +1,6 @@
 
+import { EntradaPage } from "./EntradaPage";
 
-export const SalidaPage = () => {
-  return (
-    <div>
-      
-    </div>
-  )
-}
+export const SalidaPage = () => <EntradaPage modo="salida" />;
 
 
