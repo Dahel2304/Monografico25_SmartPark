@@ -29,9 +29,9 @@ export const getEstadiasLargas = async (umbralMinutos, usuarioId) => {
   return data;
 };
 
-export const getEstadiasLargasFiltrado = async ({ umbralMinutos, usuarioId, tipoVehiculo } = {}) => {
+export const getEstadiasLargasFiltrado = async ({ umbralMinutos, fechaDesde, fechaHasta, usuarioId, tipoVehiculo } = {}) => {
   const { data } = await client.get("/reportes/operativos/estadias-largas", {
-    params: buildParams({ umbralMinutos, usuarioId, tipoVehiculo }),
+    params: buildParams({ umbralMinutos, fechaDesde, fechaHasta, usuarioId, tipoVehiculo }),
   });
   return data;
 };

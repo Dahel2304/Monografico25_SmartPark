@@ -84,10 +84,16 @@ public class OperativosReportService {
     }
 
     @Transactional(readOnly = true)
-    public ReporteTablaResponseDTO obtenerTicketsActivosActuales(Long usuarioId, String tipoVehiculo) {
-        List<Ticket> activos = filtrarPorUsuarioYTipo(ticketRepository.findAll(), usuarioId, tipoVehiculo).stream()
+    public ReporteTablaResponseDTO obtenerTicketsActivosActuales(
+            OffsetDateTime fechaDesde, OffsetDateTime fechaHasta, Long usuarioId, String tipoVehiculo) {
+        RangoFechas rango = commonService.resolverRango(fechaDesde, fechaHasta, MAX_RANGE_DIAS);
+        List<Ticket> activos = filtrarPorUsuarioYTipo(
+            ticketRepository.findAllByHoraEntradaGreaterThanEqualAndHoraEntradaLessThan(
+                rango.fechaDesde(), rango.fechaHasta()),
+            usuarioId, tipoVehiculo).stream()
                 .filter(ticket -> ticket.getEstado() != null)
                 .filter(ticket -> ESTADO_TICKET_ACTIVO.equalsIgnoreCase(ticket.getEstado().getNombre()))
+            .filter(ticket -> ticket.getHoraSalida() == null)
                 .sorted((a, b) -> {
                     LocalDateTime first = a.getHoraEntrada() == null ? LocalDateTime.MIN : a.getHoraEntrada();
                     LocalDateTime second = b.getHoraEntrada() == null ? LocalDateTime.MIN : b.getHoraEntrada();
@@ -120,13 +126,20 @@ public class OperativosReportService {
     }
 
     @Transactional(readOnly = true)
-    public ReporteTablaResponseDTO obtenerEstadiasLargas(Integer umbralMinutos, Long usuarioId, String tipoVehiculo) {
+    public ReporteTablaResponseDTO obtenerEstadiasLargas(
+            Integer umbralMinutos, OffsetDateTime fechaDesde, OffsetDateTime fechaHasta,
+            Long usuarioId, String tipoVehiculo) {
         int umbral = umbralMinutos == null || umbralMinutos < 1 ? 360 : umbralMinutos;
         LocalDateTime now = LocalDateTime.now(appClock);
+        RangoFechas rango = commonService.resolverRango(fechaDesde, fechaHasta, MAX_RANGE_DIAS);
 
-        List<Ticket> activos = filtrarPorUsuarioYTipo(ticketRepository.findAll(), usuarioId, tipoVehiculo).stream()
+        List<Ticket> activos = filtrarPorUsuarioYTipo(
+            ticketRepository.findAllByHoraEntradaGreaterThanEqualAndHoraEntradaLessThan(
+                rango.fechaDesde(), rango.fechaHasta()),
+            usuarioId, tipoVehiculo).stream()
                 .filter(ticket -> ticket.getEstado() != null)
                 .filter(ticket -> ESTADO_TICKET_ACTIVO.equalsIgnoreCase(ticket.getEstado().getNombre()))
+            .filter(ticket -> ticket.getHoraSalida() == null)
                 .sorted((a, b) -> {
                     LocalDateTime first = a.getHoraEntrada() == null ? LocalDateTime.MIN : a.getHoraEntrada();
                     LocalDateTime second = b.getHoraEntrada() == null ? LocalDateTime.MIN : b.getHoraEntrada();

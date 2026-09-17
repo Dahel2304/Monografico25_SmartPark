@@ -406,6 +406,7 @@ git push -u origin feature/mi-tarea
 # === EN GITHUB ===
 Crear Pull Request (feature → main) → Asignar al líder → Esperar review
 
+
 # === DESPUÉS DEL MERGE ===
 git checkout main
 git pull origin main

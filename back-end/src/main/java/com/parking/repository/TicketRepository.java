@@ -18,6 +18,8 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     Optional<Ticket> findTopByEspacioIdAndEstadoNombreIgnoreCaseOrderByHoraEntradaDesc(Long espacioId, String estadoNombre);
 
+    long countByEspacioIdAndEstadoNombreIgnoreCase(Long espacioId, String estadoNombre);
+
     Optional<Ticket> findTopByPlacaAndEstadoNombreIgnoreCaseOrderByHoraEntradaDesc(String placa, String estadoNombre);
 
     List<Ticket> findAllByEspacioIdInAndEstadoNombreIgnoreCaseOrderByHoraEntradaDesc(List<Long> espacioIds, String estadoNombre);

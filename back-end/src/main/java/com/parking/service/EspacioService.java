@@ -8,6 +8,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -35,6 +36,10 @@ import com.parking.repository.TipoVehiculoRepository;
 @Service
 public class EspacioService {
 
+    public static final int PISOS_TOTALES = 10;
+    private static final int TOTAL_CARROS = 198;
+    private static final int TOTAL_MOTOS = 8;
+    private static final int CAPACIDAD_MOTO = 10;
     private static final String ESTADO_LIBRE = "libre";
     private static final String ESTADO_TICKET_ACTIVO = "activo";
     private static final String ESTADO_RESERVA_PENDIENTE = "pendiente";
@@ -68,6 +73,9 @@ public class EspacioService {
                 String prefijo = "CARRO".equalsIgnoreCase(tipo) ? "CP" : "MP";
                 int numero = Integer.parseInt(codigoActual.substring(2));
                 int piso = espacio.getPiso() == null ? 1 : espacio.getPiso();
+                if (espacio.getCapacidad() == null) {
+                    espacio.setCapacidad("MOTO".equalsIgnoreCase(tipo) ? CAPACIDAD_MOTO : 1);
+                }
                 String nuevoCodigo = generarCodigo(prefijo, piso, numero);
                 if (!codigosExistentes.contains(nuevoCodigo)) {
                     espacio.setCodigoEspacio(nuevoCodigo);
@@ -75,6 +83,11 @@ public class EspacioService {
                     espacioRepository.save(espacio);
                     codigoActual = nuevoCodigo;
                 }
+            }
+            if (espacio.getCapacidad() == null) {
+                String tipo = espacio.getTipoVehiculo() == null ? "CARRO" : espacio.getTipoVehiculo().getNombre();
+                espacio.setCapacidad("MOTO".equalsIgnoreCase(tipo) ? CAPACIDAD_MOTO : 1);
+                espacioRepository.save(espacio);
             }
             codigosExistentes.add(codigoActual);
         }
@@ -141,6 +154,9 @@ public class EspacioService {
     public EspacioResponseDTO actualizarEspacio(Long id, UpdateEspacioDTO dto) {
         Espacio espacio = espacioRepository.findByIdAndActivoTrue(id)
                 .orElseThrow(() -> new NoSuchElementException("Espacio no encontrado o inactivo"));
+        if (dto.getPiso() == null || dto.getPiso() < 1 || dto.getPiso() > PISOS_TOTALES) {
+            throw new IllegalArgumentException("El piso debe estar entre 1 y " + PISOS_TOTALES);
+        }
         String estadoActual = espacio.getEstado().getNombre();
         boolean ocupado = "OCUPADO".equalsIgnoreCase(estadoActual);
         if (ocupado && !espacio.getTipoVehiculo().getNombre().equalsIgnoreCase(dto.getTipoVehiculo())) {
@@ -155,15 +171,12 @@ public class EspacioService {
         espacio.setTipoVehiculo(tipo);
         espacio.setEstado(estado);
         espacio.setPiso(dto.getPiso());
+        espacio.setCapacidad("MOTO".equalsIgnoreCase(tipo.getNombre()) ? CAPACIDAD_MOTO : 1);
         return toDto(espacioRepository.save(espacio), null, null);
     }
 
     @Transactional
     public List<EspacioResponseDTO> agregarLote(AddEspaciosLoteDTO dto) {
-
-        int cantidadCarros = dto.getCantidadCarros();
-        int cantidadMotos = dto.getCantidadMotos();
-
         TipoVehiculo tipoCarro = tipoVehiculoRepository.findByNombreIgnoreCase("carro")
                 .orElseThrow(() -> new NoSuchElementException("Tipo de vehiculo 'carro' no existe"));
         TipoVehiculo tipoMoto = tipoVehiculoRepository.findByNombreIgnoreCase("moto")
@@ -173,20 +186,16 @@ public class EspacioService {
 
         List<Espacio> nuevos = new ArrayList<>();
 
-        String prefijoCarro = "CP" + dto.getPiso();
-        Set<Integer> numerosCarro = obtenerNumerosOcupados(prefijoCarro);
-        for (int i = 0; i < cantidadCarros; i++) {
-            int numero = obtenerPrimerNumeroDisponible(numerosCarro);
-            nuevos.add(crearEspacio(tipoCarro, estadoLibre, "CP", numero, dto.getPiso()));
-            numerosCarro.add(numero);
-        }
+        int[] motosPorPiso = { 3, 3, 2 };
+        int[] carrosPorPiso = { 20, 20, 20, 20, 20, 20, 20, 20, 19, 19 };
+        redistribuirEspaciosExistentes(tipoCarro, "CP", carrosPorPiso, 1);
+        redistribuirEspaciosExistentes(tipoMoto, "MP", motosPorPiso, CAPACIDAD_MOTO);
 
-        String prefijoMoto = "MP" + dto.getPiso();
-        Set<Integer> numerosMoto = obtenerNumerosOcupados(prefijoMoto);
-        for (int i = 0; i < cantidadMotos; i++) {
-            int numero = obtenerPrimerNumeroDisponible(numerosMoto);
-            nuevos.add(crearEspacio(tipoMoto, estadoLibre, "MP", numero, dto.getPiso()));
-            numerosMoto.add(numero);
+        for (int piso = 1; piso <= PISOS_TOTALES; piso++) {
+            agregarEspaciosFaltantes(nuevos, tipoCarro, estadoLibre, "CP", piso, carrosPorPiso[piso - 1], 1);
+            if (piso <= 3) {
+                agregarEspaciosFaltantes(nuevos, tipoMoto, estadoLibre, "MP", piso, motosPorPiso[piso - 1], CAPACIDAD_MOTO);
+            }
         }
 
         List<Espacio> guardados = espacioRepository.saveAll(nuevos);
@@ -265,11 +274,58 @@ public class EspacioService {
         return reservaPorEspacio;
     }
 
-    private Espacio crearEspacio(TipoVehiculo tipoVehiculo, EstadoEspacio estadoLibre, String prefijo, int correlativo, Integer piso) {
+    private void agregarEspaciosFaltantes(List<Espacio> nuevos, TipoVehiculo tipoVehiculo, EstadoEspacio estadoLibre,
+            String prefijo, int piso, int cantidadEsperada, int capacidad) {
+        Set<Integer> numerosOcupados = obtenerNumerosOcupados(prefijo + piso);
+        for (int numero = 1; numero <= cantidadEsperada; numero++) {
+            if (!numerosOcupados.contains(numero)) {
+                nuevos.add(crearEspacio(tipoVehiculo, estadoLibre, prefijo, numero, piso, capacidad));
+            }
+        }
+    }
+
+    private void redistribuirEspaciosExistentes(TipoVehiculo tipoVehiculo, String prefijo, int[] cantidadesPorPiso,
+            int capacidad) {
+        List<Espacio> existentes = espacioRepository.findAll().stream()
+                .filter(espacio -> espacio.getTipoVehiculo() != null
+                        && espacio.getTipoVehiculo().getId().equals(tipoVehiculo.getId()))
+                .sorted(Comparator.comparing(Espacio::getId))
+                .toList();
+
+        int cantidadEsperada = 0;
+        for (int cantidad : cantidadesPorPiso) {
+            cantidadEsperada += cantidad;
+        }
+
+        List<Espacio> aRedistribuir = existentes.stream().limit(cantidadEsperada).toList();
+        if (aRedistribuir.isEmpty()) {
+            return;
+        }
+
+        for (Espacio espacio : aRedistribuir) {
+            espacio.setCodigoEspacio("RECONFIG-" + prefijo + "-" + espacio.getId());
+        }
+        espacioRepository.saveAll(aRedistribuir);
+
+        int indice = 0;
+        for (int piso = 1; piso <= cantidadesPorPiso.length; piso++) {
+            for (int numero = 1; numero <= cantidadesPorPiso[piso - 1] && indice < aRedistribuir.size(); numero++) {
+                Espacio espacio = aRedistribuir.get(indice++);
+                espacio.setCodigoEspacio(generarCodigo(prefijo, piso, numero));
+                espacio.setPiso(piso);
+                espacio.setCapacidad(capacidad);
+            }
+        }
+        espacioRepository.saveAll(aRedistribuir);
+    }
+
+    private Espacio crearEspacio(TipoVehiculo tipoVehiculo, EstadoEspacio estadoLibre, String prefijo, int correlativo,
+            Integer piso, int capacidad) {
 
         Espacio espacio = new Espacio();
         espacio.setCodigoEspacio(generarCodigo(prefijo, piso, correlativo));
         espacio.setPiso(piso);
+        espacio.setCapacidad(capacidad);
         espacio.setTipoVehiculo(tipoVehiculo);
         espacio.setEstado(estadoLibre);
         espacio.setActivo(true);
@@ -338,7 +394,9 @@ public class EspacioService {
         return new EspacioResponseDTO(
                 espacio.getId(),
                 espacio.getCodigoEspacio(),
-            espacio.getPiso() == null ? 1 : espacio.getPiso(),
+                espacio.getPiso() == null ? 1 : espacio.getPiso(),
+                espacio.getCapacidad() == null ? 1 : espacio.getCapacidad(),
+                (int) ticketRepository.countByEspacioIdAndEstadoNombreIgnoreCase(espacio.getId(), "ACTIVO"),
                 espacio.getTipoVehiculo().getNombre(),
                 espacio.getEstado().getNombre(),
             ticketActivoDTO,

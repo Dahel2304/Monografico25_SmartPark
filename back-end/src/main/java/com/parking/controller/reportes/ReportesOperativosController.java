@@ -45,16 +45,20 @@ public class ReportesOperativosController {
 
     @GetMapping("/tickets-activos")
     public ResponseEntity<ReporteTablaResponseDTO> ticketsActivos(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta,
             @RequestParam(required = false) Long usuarioId,
             @RequestParam(required = false) String tipoVehiculo) {
-        return ResponseEntity.ok(operativosReportService.obtenerTicketsActivosActuales(usuarioId, tipoVehiculo));
+        return ResponseEntity.ok(operativosReportService.obtenerTicketsActivosActuales(fechaDesde, fechaHasta, usuarioId, tipoVehiculo));
     }
 
     @GetMapping("/estadias-largas")
     public ResponseEntity<ReporteTablaResponseDTO> estadiasLargas(
             @RequestParam(required = false) Integer umbralMinutos,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta,
             @RequestParam(required = false) Long usuarioId,
             @RequestParam(required = false) String tipoVehiculo) {
-        return ResponseEntity.ok(operativosReportService.obtenerEstadiasLargas(umbralMinutos, usuarioId, tipoVehiculo));
+        return ResponseEntity.ok(operativosReportService.obtenerEstadiasLargas(umbralMinutos, fechaDesde, fechaHasta, usuarioId, tipoVehiculo));
     }
 }

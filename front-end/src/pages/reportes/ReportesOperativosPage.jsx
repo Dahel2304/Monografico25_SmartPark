@@ -101,8 +101,8 @@ export const ReportesOperativosPage = () => {
       const [entradasResp, salidasResp, ticketsResp, estadiasResp] = await Promise.all([
         getEntradasPorHora(params),
         getSalidasPorHora(params),
-        getTicketsActivosReporte({ usuarioId: params.usuarioId, tipoVehiculo: params.tipoVehiculo }),
-        getEstadiasLargasFiltrado({ umbralMinutos: 360, usuarioId: params.usuarioId, tipoVehiculo: params.tipoVehiculo }),
+        getTicketsActivosReporte(params),
+        getEstadiasLargasFiltrado({ ...params, umbralMinutos: 360 }),
       ]);
 
       setEntradasSerie(normalizeSeries(entradasResp?.items));

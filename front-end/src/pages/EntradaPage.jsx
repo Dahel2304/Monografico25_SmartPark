@@ -355,8 +355,12 @@ export const EntradaPage = ({ modo = "entrada" }) => {
             role="button"
             tabIndex={0}
             onClick={() => {
+              const capacidad = Number(space.capacidad || 1);
+              const ocupacionActual = Number(space.ocupacionActual || 0);
               if (
-                normalizeCatalogValue(space.estado) === "LIBRE"
+                (normalizeCatalogValue(space.estado) === "LIBRE"
+                  || (normalizeCatalogValue(space.tipoVehiculo) === "MOTO"
+                    && ocupacionActual < capacidad))
                 && normalizeCatalogValue(space.tipoVehiculo) === normalizeCatalogValue(tipoVehiculo)
               ) {
                 setEspacioSeleccionadoId(space.id);
@@ -366,8 +370,12 @@ export const EntradaPage = ({ modo = "entrada" }) => {
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
+                const capacidad = Number(space.capacidad || 1);
+                const ocupacionActual = Number(space.ocupacionActual || 0);
                 if (
-                  normalizeCatalogValue(space.estado) === "LIBRE"
+                  (normalizeCatalogValue(space.estado) === "LIBRE"
+                    || (normalizeCatalogValue(space.tipoVehiculo) === "MOTO"
+                      && ocupacionActual < capacidad))
                   && normalizeCatalogValue(space.tipoVehiculo) === normalizeCatalogValue(tipoVehiculo)
                 ) {
                   setEspacioSeleccionadoId(space.id);
@@ -393,6 +401,8 @@ export const EntradaPage = ({ modo = "entrada" }) => {
               numero={space.numero || space.codigoEspacio}
               estado={space.estado}
               tipoVehiculo={space.tipoVehiculo}
+              capacidad={space.capacidad}
+              ocupacionActual={space.ocupacionActual}
               ticketActivo={space.ticketActivo}
               showActions={false}
             />
