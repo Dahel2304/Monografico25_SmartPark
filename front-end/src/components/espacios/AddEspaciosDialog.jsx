@@ -8,50 +8,18 @@ import {
 } from "@/components/ui/dialog";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 export default function AddEspaciosDialog({ open, onClose, onSave }) {
-  const [carros, setCarros] = useState(0);
-  const [motos, setMotos] = useState(0);
-  const [piso, setPiso] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async () => {
     setError("");
 
-    const carrosNum = Number(carros);
-    const motosNum = Number(motos);
-    const pisoNum = Number(piso);
-
-    if (carrosNum < 0 || motosNum < 0) {
-      setError("Las cantidades deben ser mayores o iguales a 0");
-      return;
-    }
-
-    if (carrosNum === 0 && motosNum === 0) {
-      setError("Debe agregar al menos un espacio");
-      return;
-    }
-
-    if (!Number.isInteger(pisoNum) || pisoNum < 1) {
-      setError("El piso debe ser un numero mayor que 0");
-      return;
-    }
-
     try {
       setLoading(true);
 
-      await onSave({
-        cantidadCarros: carrosNum,
-        cantidadMotos: motosNum,
-        piso: pisoNum,
-      });
-
-      setCarros(0);
-      setMotos(0);
-      setPiso(1);
+      await onSave({ cantidadCarros: 198, cantidadMotos: 8, piso: 1 });
 
       onClose();
     } catch (err) {
@@ -65,40 +33,15 @@ export default function AddEspaciosDialog({ open, onClose, onSave }) {
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Agregar Espacios</DialogTitle>
+          <DialogTitle>Configurar parqueo</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
 
-          <div>
-            <Label>Piso del edificio</Label>
-            <Input
-              type="number"
-              min="1"
-              value={piso}
-              onChange={(e) => setPiso(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <Label>Espacios para carros</Label>
-            <Input
-              type="number"
-              min="0"
-              value={carros}
-              onChange={(e) => setCarros(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <Label>Espacios para motos</Label>
-            <Input
-              type="number"
-              min="0"
-              value={motos}
-              onChange={(e) => setMotos(e.target.value)}
-            />
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Se configuraran 10 pisos, 198 espacios para carros y 8 espacios para motos.
+            Cada espacio de motos tendra capacidad para 10 motos y se distribuira en los pisos 1, 2 y 3.
+          </p>
 
           {error && (
             <p className="text-sm text-red-500">

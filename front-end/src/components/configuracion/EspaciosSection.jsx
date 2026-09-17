@@ -202,8 +202,8 @@ export const EspaciosSection = () => {
   }, [categoria, pisoFiltro, espaciosCombinados, espacios, espaciosInactivos]);
 
   const pisos = useMemo(
-    () => [...new Set(espaciosCombinados.map((espacio) => Number(espacio.piso || 1)))].sort((a, b) => a - b),
-    [espaciosCombinados]
+    () => Array.from({ length: 10 }, (_, index) => index + 1),
+    []
   );
 
   const espaciosInactivosIds = useMemo(() => new Set(espaciosInactivos.map((e) => e.id)), [espaciosInactivos]);
@@ -273,7 +273,7 @@ export const EspaciosSection = () => {
           </CardTitle>
           <Button onClick={() => setOpenAddDialog(true)} className="bg-primary text-primary-foreground hover:bg-primary/90">
             <PlusCircle className="mr-2 h-4 w-4" />
-            Agregar lote
+            Configurar parqueo fijo
           </Button>
         </CardHeader>
 

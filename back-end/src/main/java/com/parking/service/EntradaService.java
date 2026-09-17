@@ -87,8 +87,14 @@ public class EntradaService {
         String placa = normalize(dto.getPlaca()).toUpperCase(Locale.ROOT);
 
         String estadoEspacioActual = normalize(espacio.getEstado().getNombre()).toUpperCase(Locale.ROOT);
+        long ocupacionActual = ticketRepository.countByEspacioIdAndEstadoNombreIgnoreCase(espacio.getId(), ESTADO_TICKET_ACTIVO);
+        int capacidad = espacio.getCapacidad() == null ? 1 : espacio.getCapacidad();
+        if (ocupacionActual >= capacidad) {
+            throw new IllegalStateException("El espacio ya alcanzo su capacidad maxima");
+        }
         
         if (!ESTADO_ESPACIO_LIBRE.equals(estadoEspacioActual)
+            && !("MOTO".equalsIgnoreCase(tipoVehiculo.getNombre()) && ESTADO_ESPACIO_OCUPADO.equals(estadoEspacioActual))
             && !ESTADO_ESPACIO_RESERVADO.equals(estadoEspacioActual)) {
             throw new IllegalStateException("Solo se puede registrar entrada en espacios libres o reservados");
         }
@@ -144,7 +150,9 @@ public class EntradaService {
 
         Ticket creado = ticketRepository.save(ticket);
 
-        espacio.setEstado(estadoOcupado);
+        if (ocupacionActual + 1 >= capacidad) {
+            espacio.setEstado(estadoOcupado);
+        }
         espacioRepository.save(espacio);
 
         return new EntradaVehiculoResponseDTO(

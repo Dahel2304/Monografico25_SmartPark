@@ -37,6 +37,9 @@ public class Espacio {
 
     @Column(nullable = true)
     private Integer piso = 1;
+
+    @Column(nullable = true)
+    private Integer capacidad = 1;
     
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "tipo_vehiculo_id", nullable = false)

@@ -27,6 +27,8 @@ export const EspacioCard = ({
   numero,
   estado,
   tipoVehiculo,
+  capacidad = 1,
+  ocupacionActual = 0,
   onEdit,
   onDelete,
   canDelete = false,
@@ -67,6 +69,9 @@ export const EspacioCard = ({
 
       <div className="text-center pr-5">
         <p className="text-lg font-bold mb-1 leading-none">{numero}</p>
+        {vehicleType === 'moto' && (
+          <p className="text-xs font-medium">{ocupacionActual}/{capacidad} motos</p>
+        )}
       </div>
     </div>
   );
