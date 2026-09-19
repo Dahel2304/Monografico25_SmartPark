@@ -15,6 +15,7 @@ export const abrirTicketEntradaPdf = async ({ ticketData, empresaTicket }) => {
 
   const numeroTicket = ticketData.codigoTicket || "-";
   const espacio = ticketData.codigoEspacio || "-";
+  const piso = ticketData.piso || 1;
   const placaTicket = ticketData.placa || "-";
   const fecha = formatDateTimeForTicket(ticketData.horaEntrada || new Date().toISOString());
   const nombreEmpresa = empresaTicket?.nombre?.trim() || "Parking";
@@ -22,6 +23,7 @@ export const abrirTicketEntradaPdf = async ({ ticketData, empresaTicket }) => {
   const contenidoQr = JSON.stringify({
     codigoTicket: numeroTicket,
     codigoEspacio: espacio,
+    piso,
     placa: placaTicket,
     horaEntrada: ticketData.horaEntrada || new Date().toISOString()
   });
@@ -73,10 +75,17 @@ export const abrirTicketEntradaPdf = async ({ ticketData, empresaTicket }) => {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.text("Placa", 8, 62);
+  doc.text("Piso", 8, 59);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text(String(piso), 8, 64);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text("Placa", 8, 70);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text(String(placaTicket), 8, 68);
+  doc.text(String(placaTicket), 8, 76);
 
   doc.addImage(codigoQr, "PNG", 52, 29, 18, 18);
   doc.setFont("helvetica", "normal");
@@ -85,24 +94,24 @@ export const abrirTicketEntradaPdf = async ({ ticketData, empresaTicket }) => {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.text("Fecha y hora", 8, 77);
+  doc.text("Fecha y hora", 8, 84);
   const fechaTexto = doc.splitTextToSize(String(fecha), 62);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.text(fechaTexto, 8, 82);
+  doc.text(fechaTexto, 8, 89);
 
   doc.setDrawColor(180);
   doc.setLineDashPattern([1, 1], 0);
-  doc.line(8, 96, 72, 96);
+  doc.line(8, 101, 72, 101);
   doc.setLineDashPattern([], 0);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6.8);
   doc.setTextColor(95);
   const empresaTexto = doc.splitTextToSize(String(nombreEmpresa), 62);
-  doc.text(empresaTexto, 40, 103, { align: "center" });
-  doc.text(String(telefonoEmpresa), 40, 110, { align: "center" });
-  doc.text("Gracias por su visita", 40, 117, { align: "center" });
+  doc.text(empresaTexto, 40, 108, { align: "center" });
+  doc.text(String(telefonoEmpresa), 40, 115, { align: "center" });
+  doc.text("Gracias por su visita", 40, 122, { align: "center" });
 
   const blob = doc.output("blob");
   const pdfUrl = URL.createObjectURL(blob);
