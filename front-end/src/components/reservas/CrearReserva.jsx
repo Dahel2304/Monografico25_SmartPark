@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
 import {
@@ -20,6 +20,7 @@ export default function CrearReserva({ onSuccess }) {
   const [fechaReserva, setFechaReserva] = useState("");
 
   const [espacioId, setEspacioId] = useState("");
+  const [pisoSeleccionado, setPisoSeleccionado] = useState("");
   const [espacios, setEspacios] = useState([]);
   const [reservaCreada, setReservaCreada] = useState(null);
 
@@ -84,14 +85,14 @@ export default function CrearReserva({ onSuccess }) {
         (espacio) => espacio.id === Number(espacioId)
       );
 
-      if (!espacioSeleccionado) {
+      if (!espacioSeleccionado || String(espacioSeleccionado.estado).toUpperCase() !== "LIBRE") {
         throw new Error("Debe seleccionar un espacio valido");
       }
 
       const data = {
         espacioId: espacioSeleccionado.id,
         placa,
-        tipoVehiculo,
+        tipoVehiculo: String(espacioSeleccionado.tipoVehiculo).toUpperCase(),
         horaInicio: fechaHoraInicio,
         clienteNombreCompleto: `${nombre} ${apellido}`.trim(),
         clienteTelefono: telefono,
@@ -146,7 +147,7 @@ export default function CrearReserva({ onSuccess }) {
   };
 
   const espaciosLibres = espacios.filter(
-    (espacio) => espacio.estado === "LIBRE"
+    (espacio) => String(espacio.estado || "").toUpperCase() === "LIBRE"
   );
 
   const carrosDisponibles = espaciosLibres.filter(
@@ -157,9 +158,32 @@ export default function CrearReserva({ onSuccess }) {
     (espacio) => espacio.tipoVehiculo === "MOTO"
   ).length;
 
-  const espaciosFiltrados = espaciosLibres.filter(
-    (espacio) => espacio.tipoVehiculo === tipoVehiculo
+  const espaciosFiltrados = espacios.filter(
+    (espacio) => String(espacio.tipoVehiculo || "").toUpperCase() === tipoVehiculo
+      && ["LIBRE", "MANTENIMIENTO"].includes(String(espacio.estado || "").toUpperCase())
   );
+
+  const pisosDisponibles = useMemo(
+    () => [...new Set(espaciosFiltrados.map((espacio) => Number(espacio.piso || 1)))].sort((a, b) => a - b),
+    [espaciosFiltrados]
+  );
+
+  const espaciosDelPiso = espaciosFiltrados.filter(
+    (espacio) => String(espacio.piso || 1) === String(pisoSeleccionado)
+  );
+
+  useEffect(() => {
+    if (!pisosDisponibles.some((piso) => String(piso) === String(pisoSeleccionado))) {
+      setPisoSeleccionado(pisosDisponibles.length ? String(pisosDisponibles[0]) : "");
+    }
+  }, [pisosDisponibles, pisoSeleccionado]);
+
+  useEffect(() => {
+    const espacioSeleccionado = espacios.find((espacio) => String(espacio.id) === String(espacioId));
+    if (!espacioSeleccionado || String(espacioSeleccionado.tipoVehiculo || "").toUpperCase() !== tipoVehiculo) {
+      setEspacioId("");
+    }
+  }, [espacios, espacioId, tipoVehiculo]);
 
   return (
     <div className="space-y-6">
@@ -175,6 +199,7 @@ export default function CrearReserva({ onSuccess }) {
             <div><strong>Codigo:</strong> {reservaCreada.codigoReserva}</div>
             <div><strong>Espacio:</strong> {reservaCreada.espacio}</div>
             <div><strong>Cliente:</strong> {reservaCreada.nombre}</div>
+            <div><strong>Correo:</strong> {reservaCreada.email}</div>
             <div><strong>Placa:</strong> {reservaCreada.placa}</div>
             <div><strong>Inicio:</strong> {formatDateTime(reservaCreada.horaInicio)}</div>
             <div className="md:col-span-2 flex justify-end">
@@ -281,7 +306,10 @@ export default function CrearReserva({ onSuccess }) {
                       className="sr-only"
                       value="CARRO"
                       checked={tipoVehiculo === "CARRO"}
-                      onChange={(e) => setTipoVehiculo(e.target.value)}
+                      onChange={(e) => {
+                        setTipoVehiculo(e.target.value);
+                        setEspacioId("");
+                      }}
                     />
                     Carro
                   </label>
@@ -299,7 +327,10 @@ export default function CrearReserva({ onSuccess }) {
                       className="sr-only"
                       value="MOTO"
                       checked={tipoVehiculo === "MOTO"}
-                      onChange={(e) => setTipoVehiculo(e.target.value)}
+                      onChange={(e) => {
+                        setTipoVehiculo(e.target.value);
+                        setEspacioId("");
+                      }}
                     />
                     Moto
                   </label>
@@ -317,25 +348,73 @@ export default function CrearReserva({ onSuccess }) {
                   />
                 </div>
 
-                <div>
-                  <Label>Seleccionar Parqueo</Label>
-                  <select
-                    className="w-full h-10 rounded-md border bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    value={espacioId}
-                    onChange={(e) => setEspacioId(e.target.value)}
-                    required
-                  >
-                    <option value="">Seleccione un parqueo</option>
+                <div className="space-y-3 md:col-span-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>Seleccionar parqueo por piso</Label>
+                    <span className="text-xs text-muted-foreground">
+                      {espaciosLibres.filter((espacio) => String(espacio.tipoVehiculo || "").toUpperCase() === tipoVehiculo).length} libres
+                    </span>
+                  </div>
 
-                    {espaciosFiltrados.map((espacio) => (
-                      <option key={espacio.id} value={espacio.id}>
-                        {espacio.codigoEspacio} - {espacio.tipoVehiculo}
-                      </option>
+                  <div className="flex flex-wrap gap-2" role="tablist" aria-label="Pisos disponibles">
+                    {pisosDisponibles.map((piso) => (
+                      <button
+                        key={piso}
+                        type="button"
+                        role="tab"
+                        aria-selected={String(piso) === String(pisoSeleccionado)}
+                        onClick={() => setPisoSeleccionado(String(piso))}
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+                          String(piso) === String(pisoSeleccionado)
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-background hover:bg-muted"
+                        )}
+                      >
+                        Piso {piso}
+                      </button>
                     ))}
-                  </select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {espaciosFiltrados.length} espacios disponibles para {tipoVehiculo.toLowerCase()}
-                  </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                    {espaciosDelPiso.map((espacio) => {
+                      const enMantenimiento = String(espacio.estado || "").toUpperCase() === "MANTENIMIENTO";
+                      const seleccionado = String(espacio.id) === String(espacioId);
+                      return (
+                        <button
+                          key={espacio.id}
+                          type="button"
+                          disabled={enMantenimiento}
+                          onClick={() => setEspacioId(String(espacio.id))}
+                          className={cn(
+                            "min-h-16 rounded-md border px-2 py-2 text-left text-sm transition-colors",
+                            enMantenimiento
+                              ? "cursor-not-allowed border-amber-300 bg-amber-50 text-amber-800"
+                              : seleccionado
+                                ? "border-primary bg-primary text-primary-foreground ring-2 ring-primary/30"
+                                : "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+                          )}
+                        >
+                          <span className="block font-semibold">{espacio.codigoEspacio}</span>
+                          <span className="block text-xs">
+                            {enMantenimiento ? "En mantenimiento" : "Libre"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {!espaciosDelPiso.length && (
+                    <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">
+                      No hay espacios para este tipo de vehículo en el piso seleccionado.
+                    </p>
+                  )}
+                  {espaciosFiltrados.some((espacio) => String(espacio.estado || "").toUpperCase() === "MANTENIMIENTO") && (
+                    <p className="text-xs font-medium text-amber-700">
+                      Los espacios en mantenimiento se muestran bloqueados y no se pueden seleccionar.
+                    </p>
+                  )}
+                  <input type="hidden" value={espacioId} required aria-label="Parqueo seleccionado" />
                 </div>
               </div>
             </div>

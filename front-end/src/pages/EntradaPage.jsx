@@ -143,14 +143,19 @@ export const EntradaPage = ({ modo = "entrada" }) => {
         espacioId: espacioSeleccionado.id
       });
 
+      const ticketConPiso = {
+        ...ticket,
+        piso: espacioSeleccionado.piso || 1
+      };
+
       setPlaca("");
       setPlacaBloqueada(false);
       setEspacioSeleccionadoId(null);
       const ticketPdf = await abrirTicketEntradaPdf({
-        ticketData: ticket,
+        ticketData: ticketConPiso,
         empresaTicket
       });
-      setTicketRegistrado({ ...ticket, codigoQr: ticketPdf.qrDataUrl });
+      setTicketRegistrado({ ...ticketConPiso, codigoQr: ticketPdf.qrDataUrl });
       toast.success("Entrada registrada correctamente");
       await fetchEspacios(false);
     } catch (error) {
@@ -355,6 +360,10 @@ export const EntradaPage = ({ modo = "entrada" }) => {
             role="button"
             tabIndex={0}
             onClick={() => {
+              if (normalizeCatalogValue(space.estado) === "MANTENIMIENTO") {
+                toast.error("Este espacio está en mantenimiento y no se puede seleccionar");
+                return;
+              }
               const capacidad = Number(space.capacidad || 1);
               const ocupacionActual = Number(space.ocupacionActual || 0);
               if (
@@ -370,6 +379,10 @@ export const EntradaPage = ({ modo = "entrada" }) => {
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
+                if (normalizeCatalogValue(space.estado) === "MANTENIMIENTO") {
+                  toast.error("Este espacio está en mantenimiento y no se puede seleccionar");
+                  return;
+                }
                 const capacidad = Number(space.capacidad || 1);
                 const ocupacionActual = Number(space.ocupacionActual || 0);
                 if (
@@ -382,7 +395,9 @@ export const EntradaPage = ({ modo = "entrada" }) => {
                 }
               }
             }}
-            className={`relative text-left rounded-lg transition-all cursor-pointer ${espacioSeleccionadoId === space.id ? "ring-2 ring-primary ring-offset-2" : ""}`}
+            className={`relative text-left rounded-lg transition-all ${normalizeCatalogValue(space.estado) === "MANTENIMIENTO" ? "cursor-not-allowed" : "cursor-pointer"} ${espacioSeleccionadoId === space.id ? "ring-2 ring-primary ring-offset-2" : ""}`}
+            aria-disabled={normalizeCatalogValue(space.estado) === "MANTENIMIENTO"}
+            title={normalizeCatalogValue(space.estado) === "MANTENIMIENTO" ? "Está en mantenimiento y no se puede seleccionar" : undefined}
           >
             <button
               type="button"
@@ -406,6 +421,11 @@ export const EntradaPage = ({ modo = "entrada" }) => {
               ticketActivo={space.ticketActivo}
               showActions={false}
             />
+            {normalizeCatalogValue(space.estado) === "MANTENIMIENTO" && (
+              <p className="absolute inset-x-1 bottom-1 rounded bg-slate-900/80 px-1 py-0.5 text-center text-[10px] font-semibold leading-tight text-white">
+                En mantenimiento: no se puede seleccionar
+              </p>
+            )}
           </div>
         ))}
       </div>

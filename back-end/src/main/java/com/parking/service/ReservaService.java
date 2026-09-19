@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -193,7 +194,8 @@ public class ReservaService {
     }
 
     private String generarCodigoReserva() {
-        return "R-" + System.currentTimeMillis();
+        String codigo = UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase(Locale.ROOT);
+        return "R-" + codigo;
     }
 
     private Usuario obtenerUsuarioAutenticado() {
