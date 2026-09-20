@@ -37,8 +37,8 @@ import com.parking.repository.TipoVehiculoRepository;
 public class EspacioService {
 
     public static final int PISOS_TOTALES = 10;
-    private static final int TOTAL_CARROS = 198;
-    private static final int TOTAL_MOTOS = 8;
+    // private static final int TOTAL_CARROS = 198;
+    // private static final int TOTAL_MOTOS = 8;
     private static final int CAPACIDAD_MOTO = 10;
     private static final String ESTADO_LIBRE = "libre";
     private static final String ESTADO_TICKET_ACTIVO = "activo";
@@ -349,13 +349,13 @@ public class EspacioService {
         return ocupados;
     }
 
-    private int obtenerPrimerNumeroDisponible(Set<Integer> ocupados) {
-        int numero = 1;
-        while (ocupados.contains(numero)) {
-            numero++;
-        }
-        return numero;
-    }
+    // private int obtenerPrimerNumeroDisponible(Set<Integer> ocupados) {
+    //     int numero = 1;
+    //     while (ocupados.contains(numero)) {
+    //         numero++;
+    //     }
+    //     return numero;
+    // }
 
     private String normalizarCodigo(String codigo) {
         if (codigo == null) {

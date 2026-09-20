@@ -52,7 +52,7 @@ public class ReportesCommonService {
             if (hastaLocal.isBefore(desdeLocal)) {
                 throw new IllegalArgumentException("fechaHasta no puede ser menor que fechaDesde");
             }
-            rango = new RangoFechas(desdeLocal, hastaLocal);
+            rango = new RangoFechas(desdeLocal, hastaLocal.plusMinutes(1));
             return rango;
         }
 
@@ -62,7 +62,7 @@ public class ReportesCommonService {
         }
 
         if (hastaLocal != null) {
-            rango = new RangoFechas(hastaLocal.minusDays(1), hastaLocal);
+            rango = new RangoFechas(hastaLocal.minusDays(1), hastaLocal.plusMinutes(1));
             return rango;
         }
 
