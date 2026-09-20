@@ -21,8 +21,3 @@ export const cancelarReserva = async (codigoReserva, motivoCancelacion) => {
   });
   return data;
 };
-
-export const reenviarCorreoReserva = async (codigoReserva) => {
-  const { data } = await client.patch(`/reservas/${codigoReserva}/reenviar-correo`);
-  return data;
-};

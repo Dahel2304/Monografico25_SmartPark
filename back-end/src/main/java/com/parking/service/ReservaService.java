@@ -7,8 +7,6 @@ import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -33,8 +31,6 @@ import com.parking.repository.UsuarioRepository;
 @Service
 public class ReservaService {
 
-    private static final Logger log = LoggerFactory.getLogger(ReservaService.class);
-
     private static final String ESTADO_PENDIENTE = "PENDIENTE";
     private static final String ESTADO_ACTIVA = "ACTIVA";
     private static final String ESTADO_CANCELADA = "CANCELADA";
@@ -47,7 +43,6 @@ public class ReservaService {
     private final EstadoEspacioRepository estadoEspacioRepository;
     private final TipoVehiculoRepository tipoVehiculoRepository;
     private final UsuarioRepository usuarioRepository;
-    private final ReservaEmailService reservaEmailService;
     private final Clock appClock;
 
     public ReservaService(ReservaRepository reservaRepository,
@@ -56,7 +51,6 @@ public class ReservaService {
             EstadoEspacioRepository estadoEspacioRepository,
             TipoVehiculoRepository tipoVehiculoRepository,
             UsuarioRepository usuarioRepository,
-            ReservaEmailService reservaEmailService,
             Clock appClock) {
         this.reservaRepository = reservaRepository;
         this.estadoReservaRepository = estadoReservaRepository;
@@ -64,7 +58,6 @@ public class ReservaService {
         this.estadoEspacioRepository = estadoEspacioRepository;
         this.tipoVehiculoRepository = tipoVehiculoRepository;
         this.usuarioRepository = usuarioRepository;
-        this.reservaEmailService = reservaEmailService;
         this.appClock = appClock;
     }
 
@@ -125,35 +118,7 @@ public class ReservaService {
         espacio.setEstado(estadoEspacioReservado);
         espacioRepository.save(espacio);
 
-        try {
-            reservaEmailService.enviarConfirmacionReserva(creada);
-            creada.setCorreoEnviado(true);
-            reservaRepository.save(creada);
-        } catch (Exception ex) {
-            log.warn("No se pudo enviar correo de confirmacion para la reserva {}", creada.getCodigoReserva(), ex);
-        }
-
         return toDto(creada);
-    }
-
-    @Transactional
-    public ReservaResponseDTO reenviarCorreoReserva(String codigoReserva) {
-        Reserva reserva = reservaRepository.findByCodigoReserva(normalize(codigoReserva))
-                .orElseThrow(() -> new NoSuchElementException("Reserva no encontrada"));
-
-        if (Boolean.TRUE.equals(reserva.getCorreoEnviado())) {
-            throw new IllegalStateException("El correo ya fue enviado para esta reserva");
-        }
-
-        try {
-            reservaEmailService.enviarConfirmacionReserva(reserva);
-            reserva.setCorreoEnviado(true);
-        } catch (Exception ex) {
-            log.warn("No se pudo reenviar correo para la reserva {}", reserva.getCodigoReserva(), ex);
-        }
-
-        Reserva actualizada = reservaRepository.save(reserva);
-        return toDto(actualizada);
     }
 
     @Transactional
@@ -176,12 +141,6 @@ public class ReservaService {
         Reserva actualizada = reservaRepository.save(reserva);
 
         actualizarEstadoEspacio(actualizada, ESTADO_ESPACIO_LIBRE);
-
-        try {
-            reservaEmailService.enviarCancelacionReserva(actualizada);
-        } catch (Exception ex) {
-            log.warn("No se pudo enviar correo de cancelacion para la reserva {}", actualizada.getCodigoReserva(), ex);
-        }
 
         return toDto(actualizada);
     }
