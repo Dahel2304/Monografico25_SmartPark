@@ -60,7 +60,6 @@ const KPI_ORDER = [
 export const ReportesReservasPage = () => {
   const [fechaDesde, setFechaDesde] = useState(startOfTodayInput());
   const [fechaHasta, setFechaHasta] = useState(nowInput());
-  const [granularidad, setGranularidad] = useState("dia");
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState("TODOS");
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -87,6 +86,7 @@ export const ReportesReservasPage = () => {
       const paramsRango = {
         fechaDesde: toApiOffsetDateTime(fechaDesde),
         fechaHasta: toApiOffsetDateTime(fechaHasta),
+        usuarioId: usuarioSeleccionado !== "TODOS" ? Number(usuarioSeleccionado) : undefined,
       };
 
       const [estadoResp, cancelacionesResp, proximasResp] = await Promise.all([
@@ -143,7 +143,6 @@ export const ReportesReservasPage = () => {
   const limpiarFiltros = () => {
     setFechaDesde(startOfTodayInput());
     setFechaHasta(nowInput());
-    setGranularidad("dia");
     setUsuarioSeleccionado("TODOS");
   };
 
@@ -158,8 +157,7 @@ export const ReportesReservasPage = () => {
         fechaHasta={fechaHasta}
         onFechaDesdeChange={setFechaDesde}
         onFechaHastaChange={setFechaHasta}
-        granularidad={granularidad}
-        onGranularidadChange={setGranularidad}
+        showGranularidadFilter={false}
         usuarioSeleccionado={usuarioSeleccionado}
         onUsuarioSeleccionadoChange={setUsuarioSeleccionado}
         usuarios={usuarios}

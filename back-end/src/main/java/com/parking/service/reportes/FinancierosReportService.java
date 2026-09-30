@@ -32,7 +32,7 @@ import com.parking.service.reportes.common.ReportesCommonService.RangoFechas;
 @Service
 public class FinancierosReportService {
 
-    private static final String MONEDA_DEFAULT = "GTQ";
+    private static final String MONEDA_DEFAULT = "DOP";
     private static final int MAX_RANGE_DIAS = 92;
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
@@ -50,10 +50,11 @@ public class FinancierosReportService {
     public ReporteSerieTemporalResponseDTO obtenerIngresosPorPeriodo(
             OffsetDateTime fechaDesde,
             OffsetDateTime fechaHasta,
-            String granularidad) {
+            String granularidad,
+            Long usuarioId) {
         RangoFechas rango = resolverRango(fechaDesde, fechaHasta);
         String granularidadNormalizada = normalizarGranularidad(granularidad);
-        List<Pago> pagos = obtenerPagosEnRango(rango);
+        List<Pago> pagos = obtenerPagosEnRango(rango, usuarioId);
 
         java.util.Map<String, BigDecimal> ingresosPorPeriodo = pagos.stream()
                 .filter(pago -> pago.getHoraPago() != null)
@@ -73,9 +74,10 @@ public class FinancierosReportService {
     }
 
     @Transactional(readOnly = true)
-    public ReporteFinancieroResponseDTO obtenerPromediosFinancieros(OffsetDateTime fechaDesde, OffsetDateTime fechaHasta) {
+    public ReporteFinancieroResponseDTO obtenerPromediosFinancieros(
+            OffsetDateTime fechaDesde, OffsetDateTime fechaHasta, Long usuarioId) {
         RangoFechas rango = resolverRango(fechaDesde, fechaHasta);
-        List<Pago> pagos = obtenerPagosEnRango(rango);
+        List<Pago> pagos = obtenerPagosEnRango(rango, usuarioId);
 
         BigDecimal sumaMontos = pagos.stream()
                 .map(Pago::getMonto)
@@ -121,9 +123,10 @@ public class FinancierosReportService {
     }
 
     @Transactional(readOnly = true)
-    public ReporteTablaResponseDTO obtenerIngresosPorTipoVehiculo(OffsetDateTime fechaDesde, OffsetDateTime fechaHasta) {
+    public ReporteTablaResponseDTO obtenerIngresosPorTipoVehiculo(
+            OffsetDateTime fechaDesde, OffsetDateTime fechaHasta, Long usuarioId) {
         RangoFechas rango = resolverRango(fechaDesde, fechaHasta);
-        List<Pago> pagos = obtenerPagosEnRango(rango);
+        List<Pago> pagos = obtenerPagosEnRango(rango, usuarioId);
 
         java.util.Map<String, BigDecimal> ingresosPorTipo = pagos.stream()
                 .collect(Collectors.groupingBy(
@@ -156,9 +159,10 @@ public class FinancierosReportService {
     }
 
     @Transactional(readOnly = true)
-    public ReporteTablaResponseDTO obtenerIngresosPorMetodoPago(OffsetDateTime fechaDesde, OffsetDateTime fechaHasta) {
+    public ReporteTablaResponseDTO obtenerIngresosPorMetodoPago(
+            OffsetDateTime fechaDesde, OffsetDateTime fechaHasta, Long usuarioId) {
         RangoFechas rango = resolverRango(fechaDesde, fechaHasta);
-        List<Pago> pagos = obtenerPagosEnRango(rango);
+        List<Pago> pagos = obtenerPagosEnRango(rango, usuarioId);
 
         java.util.Map<String, BigDecimal> ingresosPorMetodo = pagos.stream()
                 .collect(Collectors.groupingBy(
@@ -188,10 +192,11 @@ public class FinancierosReportService {
     public ReporteTopNResponseDTO obtenerRankingHorasPicoPorIngreso(
             OffsetDateTime fechaDesde,
             OffsetDateTime fechaHasta,
-            Integer limite) {
+            Integer limite,
+            Long usuarioId) {
         RangoFechas rango = resolverRango(fechaDesde, fechaHasta);
         int limiteNormalizado = limite == null ? 5 : Math.min(Math.max(limite, 1), 24);
-        List<Pago> pagos = obtenerPagosEnRango(rango);
+        List<Pago> pagos = obtenerPagosEnRango(rango, usuarioId);
 
         java.util.Map<Integer, BigDecimal> ingresosPorHora = pagos.stream()
                 .filter(pago -> pago.getHoraPago() != null)
@@ -245,10 +250,17 @@ public class FinancierosReportService {
         return value.format(DATE_TIME_FORMATTER);
     }
 
-    private List<Pago> obtenerPagosEnRango(RangoFechas rango) {
-        return pagoRepository.findAllByHoraPagoGreaterThanEqualAndHoraPagoLessThan(
+    private List<Pago> obtenerPagosEnRango(RangoFechas rango, Long usuarioId) {
+        List<Pago> pagos = pagoRepository.findAllByHoraPagoGreaterThanEqualAndHoraPagoLessThan(
                 rango.fechaDesde(),
                 rango.fechaHasta());
+        if (usuarioId == null) {
+            return pagos;
+        }
+        return pagos.stream()
+                .filter(pago -> pago.getProcesadoPor() != null
+                        && usuarioId.equals(pago.getProcesadoPor().getId()))
+                .toList();
     }
 
     private String normalizarGranularidad(String granularidad) {

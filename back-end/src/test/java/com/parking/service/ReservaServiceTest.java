@@ -32,4 +32,5 @@ class ReservaServiceTest {
             assertTrue(codigos.add(codigo), "Se generó un código de reserva duplicado: " + codigo);
         }
     }
+
 }

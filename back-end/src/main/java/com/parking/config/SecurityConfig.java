@@ -74,7 +74,6 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/reservas").hasAnyAuthority("ROLE_OPERADOR", "ROLE_operador", "ROLE_ADMIN", "ROLE_admin")
                 .requestMatchers(HttpMethod.GET, "/reservas/*").hasAnyAuthority("ROLE_OPERADOR", "ROLE_operador", "ROLE_ADMIN", "ROLE_admin")
                 .requestMatchers(HttpMethod.POST, "/reservas").hasAnyAuthority("ROLE_OPERADOR", "ROLE_operador", "ROLE_ADMIN", "ROLE_admin")
-                .requestMatchers(HttpMethod.PATCH, "/reservas/*/confirmar-llegada").hasAnyAuthority("ROLE_OPERADOR", "ROLE_operador", "ROLE_ADMIN", "ROLE_admin")
                 .requestMatchers(HttpMethod.PATCH, "/reservas/*/cancelar").hasAnyAuthority("ROLE_OPERADOR", "ROLE_operador", "ROLE_ADMIN", "ROLE_admin")
                 .requestMatchers(HttpMethod.POST, "/entradas").hasAnyAuthority("ROLE_OPERADOR", "ROLE_operador", "ROLE_ADMIN", "ROLE_admin")
                 .requestMatchers(HttpMethod.GET, "/salidas/espacio/*/resumen").hasAnyAuthority("ROLE_OPERADOR", "ROLE_operador", "ROLE_ADMIN", "ROLE_admin")

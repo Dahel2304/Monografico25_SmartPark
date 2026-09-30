@@ -99,28 +99,44 @@ public class EntradaService {
             throw new IllegalStateException("Solo se puede registrar entrada en espacios libres o reservados");
         }
 
-        if (ESTADO_ESPACIO_RESERVADO.equals(estadoEspacioActual)) {
-            Reserva reservaPendiente = reservaRepository
-                .findTopByEspacioIdAndEstadoNombreIgnoreCaseOrderByHoraInicioDesc(
-                    espacio.getId(),
-                    ESTADO_RESERVA_PENDIENTE)
-                    .orElse(null);
-
-            if (reservaPendiente != null) {
+        Reserva reservaCheckIn = null;
+        if (dto.getCodigoReserva() != null && !dto.getCodigoReserva().isBlank()) {
+            reservaCheckIn = reservaRepository.findByCodigoReservaIgnoreCase(dto.getCodigoReserva().trim())
+                    .filter(reserva -> reserva.getEspacio().getId().equals(espacio.getId()))
+                    .filter(reserva -> reserva.getPlaca().equalsIgnoreCase(placa))
+                    .filter(reserva -> reserva.getEstado() != null
+                            && (ESTADO_RESERVA_PENDIENTE.equalsIgnoreCase(reserva.getEstado().getNombre())
+                                    || ESTADO_RESERVA_ACTIVA.equalsIgnoreCase(reserva.getEstado().getNombre())))
+                    .orElseThrow(() -> new IllegalStateException(
+                            "La reserva no coincide con el espacio, la placa o el estado seleccionados"));
+            if (ESTADO_RESERVA_PENDIENTE.equalsIgnoreCase(reservaCheckIn.getEstado().getNombre())) {
                 EstadoReserva estadoActiva = estadoReservaRepository.findByNombreIgnoreCase(ESTADO_RESERVA_ACTIVA)
                         .orElseThrow(() -> new NoSuchElementException("Estado de reserva ACTIVA no encontrado"));
-                reservaPendiente.setEstado(estadoActiva);
-                reservaRepository.save(reservaPendiente);
-            } else {
-                boolean reservaActiva = reservaRepository
-                    .findTopByEspacioIdAndEstadoNombreIgnoreCaseOrderByHoraInicioDesc(
-                        espacio.getId(),
-                        ESTADO_RESERVA_ACTIVA)
-                        .isPresent();
+                reservaCheckIn.setEstado(estadoActiva);
+                reservaRepository.save(reservaCheckIn);
+            }
+        }
 
-                if (!reservaActiva) {
-                    throw new IllegalStateException(
-                            "El espacio esta reservado. Solo se permite entrada para la reserva activa asociada");
+        if (ESTADO_ESPACIO_RESERVADO.equals(estadoEspacioActual)) {
+            if (reservaCheckIn == null) {
+                Reserva reservaPendiente = reservaRepository.findTopByEspacioIdAndEstadoNombreIgnoreCaseOrderByHoraInicioDesc(
+                    espacio.getId(), ESTADO_RESERVA_PENDIENTE).orElse(null);
+
+                if (reservaPendiente != null) {
+                    EstadoReserva estadoActiva = estadoReservaRepository.findByNombreIgnoreCase(ESTADO_RESERVA_ACTIVA)
+                            .orElseThrow(() -> new NoSuchElementException("Estado de reserva ACTIVA no encontrado"));
+                    reservaPendiente.setEstado(estadoActiva);
+                    reservaRepository.save(reservaPendiente);
+                } else {
+                    boolean reservaActiva = reservaRepository
+                            .findTopByEspacioIdAndEstadoNombreIgnoreCaseOrderByHoraInicioDesc(
+                                    espacio.getId(), ESTADO_RESERVA_ACTIVA)
+                            .isPresent();
+
+                    if (!reservaActiva) {
+                        throw new IllegalStateException(
+                                "El espacio esta reservado. Solo se permite entrada para la reserva activa asociada");
+                    }
                 }
             }
         }
@@ -150,9 +166,7 @@ public class EntradaService {
 
         Ticket creado = ticketRepository.save(ticket);
 
-        if (ocupacionActual + 1 >= capacidad) {
-            espacio.setEstado(estadoOcupado);
-        }
+        espacio.setEstado(estadoOcupado);
         espacioRepository.save(espacio);
 
         return new EntradaVehiculoResponseDTO(

@@ -132,21 +132,22 @@ export default function ListaReservas({ refresh }) {
 
   const handleConfirmar = (reserva) => {
     const codigoReserva = reserva?.codigoReserva || "";
+    if (!codigoReserva) return;
+
     try {
       setProcesandoCodigo(codigoReserva);
-
       navigate("/entrada", {
         state: {
           reservaConfirmada: true,
-          placa: reserva?.placa,
-          tipoVehiculo: reserva?.tipoVehiculo,
-          espacioId: reserva?.espacioId,
-          codigoReserva: reserva?.codigoReserva,
+          placa: reserva.placa,
+          tipoVehiculo: reserva.tipoVehiculo,
+          espacioId: reserva.espacioId,
+          codigoReserva: reserva.codigoReserva,
         },
       });
     } catch (error) {
       console.error(error);
-      toast.error(getErrorMessage(error, "Error enviando a entrada"));
+      toast.error(getErrorMessage(error, "Error preparando el registro de llegada"));
     } finally {
       setProcesandoCodigo("");
     }
@@ -370,13 +371,13 @@ export default function ListaReservas({ refresh }) {
 
                 <TableCell className="space-x-2 whitespace-nowrap">
 
-                  {filtro === "pendientes" && (
+                  {(filtro === "pendientes" || filtro === "activas") && (
                     <Button
                       size="sm"
                       disabled={procesandoCodigo === reserva.codigoReserva}
                       onClick={() => handleConfirmar(reserva)}
                     >
-                      {procesandoCodigo === reserva.codigoReserva ? "Procesando..." : "Confirmar"}
+                      {procesandoCodigo === reserva.codigoReserva ? "Procesando..." : "Registrar llegada"}
                     </Button>
                   )}
 

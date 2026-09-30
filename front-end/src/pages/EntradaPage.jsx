@@ -67,6 +67,7 @@ export const EntradaPage = ({ modo = "entrada" }) => {
   const [espacioSeleccionadoId, setEspacioSeleccionadoId] = useState(null);
   const [placa, setPlaca] = useState("");
   const [placaBloqueada, setPlacaBloqueada] = useState(false);
+  const [codigoReserva, setCodigoReserva] = useState("");
 
   const [ticketRegistrado, setTicketRegistrado] = useState(null);
   const [espacioDetalle, setEspacioDetalle] = useState(null);
@@ -124,7 +125,12 @@ export const EntradaPage = ({ modo = "entrada" }) => {
     }
 
     const estadoEspacio = normalizeCatalogValue(espacioSeleccionado.estado);
-    if (estadoEspacio !== "LIBRE" && estadoEspacio !== "RESERVADO") {
+    const capacidadEspacio = Number(espacioSeleccionado.capacidad || 1);
+    const ocupacionEspacio = Number(espacioSeleccionado.ocupacionActual || 0);
+    const motoConCupo = normalizeCatalogValue(espacioSeleccionado.tipoVehiculo) === "MOTO"
+      && estadoEspacio === "OCUPADO"
+      && ocupacionEspacio < capacidadEspacio;
+    if (estadoEspacio !== "LIBRE" && estadoEspacio !== "RESERVADO" && !motoConCupo) {
       toast.error("Seleccione un espacio LIBRE para registrar la entrada");
       return;
     }
@@ -140,7 +146,8 @@ export const EntradaPage = ({ modo = "entrada" }) => {
       const ticket = await registrarEntradaVehiculo({
         placa: placa.trim().toUpperCase(),
         tipoVehiculo,
-        espacioId: espacioSeleccionado.id
+        espacioId: espacioSeleccionado.id,
+        codigoReserva: codigoReserva || undefined
       });
 
       const ticketConPiso = {
@@ -150,6 +157,7 @@ export const EntradaPage = ({ modo = "entrada" }) => {
 
       setPlaca("");
       setPlacaBloqueada(false);
+      setCodigoReserva("");
       setEspacioSeleccionadoId(null);
       const ticketPdf = await abrirTicketEntradaPdf({
         ticketData: ticketConPiso,
@@ -294,6 +302,8 @@ export const EntradaPage = ({ modo = "entrada" }) => {
     if (prefill.placa) {
       setPlaca(String(prefill.placa).toUpperCase());
     }
+
+    setCodigoReserva(String(prefill.codigoReserva || ""));
 
     setPlacaBloqueada(true);
 
@@ -489,7 +499,7 @@ export const EntradaPage = ({ modo = "entrada" }) => {
                   Ocupados: {stats.ocupado}
                 </Badge>
                 <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50">
-                  Reservados: {stats.reservado}
+                  Espacios reservados: {stats.reservado}
                 </Badge>
               </div>
 

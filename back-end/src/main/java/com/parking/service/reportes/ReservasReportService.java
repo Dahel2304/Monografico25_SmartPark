@@ -46,9 +46,13 @@ public class ReservasReportService {
     }
 
     @Transactional(readOnly = true)
-        public ReporteResumenKpiResponseDTO obtenerReservasPorEstado(OffsetDateTime fechaDesde, OffsetDateTime fechaHasta) {
+            public ReporteResumenKpiResponseDTO obtenerReservasPorEstado(
+                    OffsetDateTime fechaDesde, OffsetDateTime fechaHasta, Long usuarioId) {
         RangoFechas rango = commonService.resolverRango(fechaDesde, fechaHasta, MAX_RANGE_DIAS);
-        List<Reserva> reservas = obtenerReservasCreadasEnRango(rango);
+                List<Reserva> reservas = obtenerReservasCreadasEnRango(rango).stream()
+                        .filter(reserva -> usuarioId == null || (reserva.getCreadoPor() != null
+                                && usuarioId.equals(reserva.getCreadoPor().getId())))
+                        .toList();
 
         long pendientes = contarPorEstado(reservas, ESTADO_RESERVA_PENDIENTE);
         long activas = contarPorEstado(reservas, ESTADO_RESERVA_ACTIVA);
@@ -100,9 +104,10 @@ public class ReservasReportService {
             OffsetDateTime fechaDesde,
             OffsetDateTime fechaHasta,
             Integer page,
-            Integer size) {
+                        Integer size,
+                        Long usuarioId) {
         RangoFechas rango = commonService.resolverRango(fechaDesde, fechaHasta, MAX_RANGE_DIAS);
-        List<Reserva> canceladas = obtenerReservasCanceladasEnRango(rango);
+                List<Reserva> canceladas = obtenerReservasCanceladasEnRango(rango, usuarioId);
 
         List<String> columnas = List.of(
                 "codigoReserva",
@@ -145,10 +150,12 @@ public class ReservasReportService {
                 .toList();
     }
 
-    private List<Reserva> obtenerReservasCanceladasEnRango(RangoFechas rango) {
+        private List<Reserva> obtenerReservasCanceladasEnRango(RangoFechas rango, Long usuarioId) {
         return reservaRepository.findAllByOrderByFechaCreacionDesc().stream()
                 .filter(reserva -> reserva.getEstado() != null)
                 .filter(reserva -> ESTADO_RESERVA_CANCELADA.equalsIgnoreCase(reserva.getEstado().getNombre()))
+                                .filter(reserva -> usuarioId == null || (reserva.getCanceladoPor() != null
+                                                && usuarioId.equals(reserva.getCanceladoPor().getId())))
                 .filter(reserva -> reserva.getHoraFin() != null)
                 .filter(reserva -> !reserva.getHoraFin().isBefore(rango.fechaDesde())
                         && reserva.getHoraFin().isBefore(rango.fechaHasta()))

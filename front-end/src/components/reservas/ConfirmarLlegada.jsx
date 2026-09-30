@@ -1,9 +1,8 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 
-import {
-  buscarReservaPorCodigo,
-} from "../../api/reservas";
+import { buscarReservaPorCodigo } from "../../api/reservas";
 
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -50,6 +49,7 @@ const formatDateTime = (value) => {
 };
 
 export default function ConfirmarLlegada({ onSuccess }) {
+  const navigate = useNavigate();
 
   const [codigoReserva, setCodigoReserva] = useState("");
   const [reserva, setReserva] = useState(null);
@@ -103,12 +103,16 @@ export default function ConfirmarLlegada({ onSuccess }) {
       setError("");
       setSuccess("");
 
-      setCodigoReserva("");
-      setReserva(null);
-
-      if (onSuccess) {
-        onSuccess();
-      }
+      navigate("/entrada", {
+        state: {
+          reservaConfirmada: true,
+          placa: reserva.placa,
+          tipoVehiculo: reserva.tipoVehiculo,
+          espacioId: reserva.espacioId,
+          codigoReserva: reserva.codigoReserva,
+        },
+      });
+      onSuccess?.();
 
     } catch (err) {
       const mensajeError =
@@ -177,7 +181,7 @@ export default function ConfirmarLlegada({ onSuccess }) {
 
         <Button
           onClick={handleConfirmar}
-          disabled={loading || !reserva}
+          disabled={loading || !reserva || (reserva.estado || "").toUpperCase() !== "PENDIENTE"}
           className="w-full"
         >
           {loading ? "Confirmando..." : "Confirmar Llegada"}
