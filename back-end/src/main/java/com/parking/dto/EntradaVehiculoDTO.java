@@ -18,4 +18,6 @@ public class EntradaVehiculoDTO {
 
     @NotNull(message = "El id del espacio es requerido")
     private Long espacioId;
+
+    private String codigoReserva;
 }

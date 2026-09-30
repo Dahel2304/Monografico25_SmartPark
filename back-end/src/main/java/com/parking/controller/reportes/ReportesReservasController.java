@@ -26,8 +26,9 @@ public class ReportesReservasController {
     @GetMapping("/por-estado")
     public ResponseEntity<ReporteResumenKpiResponseDTO> reservasPorEstado(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaDesde,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta) {
-        return ResponseEntity.ok(reservasReportService.obtenerReservasPorEstado(fechaDesde, fechaHasta));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta,
+            @RequestParam(required = false) Long usuarioId) {
+        return ResponseEntity.ok(reservasReportService.obtenerReservasPorEstado(fechaDesde, fechaHasta, usuarioId));
     }
 
     @GetMapping("/proximas")
@@ -41,8 +42,9 @@ public class ReportesReservasController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaDesde,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size) {
-        return ResponseEntity.ok(reservasReportService.obtenerCancelacionesDetalle(fechaDesde, fechaHasta, page, size));
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) Long usuarioId) {
+        return ResponseEntity.ok(reservasReportService.obtenerCancelacionesDetalle(fechaDesde, fechaHasta, page, size, usuarioId));
     }
 
 }

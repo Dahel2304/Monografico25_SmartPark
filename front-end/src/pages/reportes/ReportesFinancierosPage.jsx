@@ -146,6 +146,7 @@ export const ReportesFinancierosPage = () => {
         fechaDesde: toApiOffsetDateTime(fechaDesde),
         fechaHasta: toApiOffsetDateTime(fechaHasta),
         granularidad: normalizarGranularidadFinanciera(granularidad),
+        usuarioId: usuarioSeleccionado !== "TODOS" ? Number(usuarioSeleccionado) : undefined,
       };
 
       const [ingresosResp, promediosResp, tipoResp, metodoResp, rankingResp] = await Promise.all([
@@ -156,6 +157,7 @@ export const ReportesFinancierosPage = () => {
         getRankingHorasPicoPorIngreso({
           fechaDesde: params.fechaDesde,
           fechaHasta: params.fechaHasta,
+          usuarioId: params.usuarioId,
           limite: 5,
         }),
       ]);
@@ -177,6 +179,7 @@ export const ReportesFinancierosPage = () => {
         fechaDesde: toApiOffsetDateTimeFromDate(inicioAnterior),
         fechaHasta: toApiOffsetDateTimeFromDate(finAnterior),
         granularidad: normalizarGranularidadFinanciera(granularidad),
+        usuarioId: params.usuarioId,
       });
 
       const serieAnterior = transformSerieTemporalToChart(ingresosPrevResp);

@@ -177,7 +177,13 @@ public class SalidaService {
         ticket.setEstado(estadoCerrado);
         Ticket ticketActualizado = ticketRepository.save(ticket);
 
-        espacio.setEstado(estadoLibre);
+        long ticketsActivosRestantes = ticketRepository.countByEspacioIdAndEstadoNombreIgnoreCase(
+            espacio.getId(), ESTADO_TICKET_ACTIVO);
+        EstadoEspacio estadoFinalEspacio = ticketsActivosRestantes > 0
+            ? estadoEspacioRepository.findByNombreIgnoreCase(ESTADO_ESPACIO_OCUPADO)
+                .orElseThrow(() -> new NoSuchElementException("Estado de espacio OCUPADO no encontrado"))
+            : estadoLibre;
+        espacio.setEstado(estadoFinalEspacio);
         espacioRepository.save(espacio);
 
         finalizarReservaActivaSiAplica(espacio.getId(), ticketActualizado.getPlaca(), horaSalida);

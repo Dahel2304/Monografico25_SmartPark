@@ -391,14 +391,20 @@ public class EspacioService {
             );
         }
 
+        long ocupacionActual = ticketRepository.countByEspacioIdAndEstadoNombreIgnoreCase(espacio.getId(), "ACTIVO");
+        String estadoActual = espacio.getEstado().getNombre();
+        if (ocupacionActual > 0 && "RESERVADO".equalsIgnoreCase(estadoActual)) {
+            estadoActual = "OCUPADO";
+        }
+
         return new EspacioResponseDTO(
                 espacio.getId(),
                 espacio.getCodigoEspacio(),
                 espacio.getPiso() == null ? 1 : espacio.getPiso(),
                 espacio.getCapacidad() == null ? 1 : espacio.getCapacidad(),
-                (int) ticketRepository.countByEspacioIdAndEstadoNombreIgnoreCase(espacio.getId(), "ACTIVO"),
+                (int) ocupacionActual,
                 espacio.getTipoVehiculo().getNombre(),
-                espacio.getEstado().getNombre(),
+                estadoActual,
             ticketActivoDTO,
             reservaActivaDTO
         );

@@ -29,36 +29,41 @@ public class ReportesFinancierosController {
     public ResponseEntity<ReporteSerieTemporalResponseDTO> ingresosPorPeriodo(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaDesde,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta,
-            @RequestParam(required = false) String granularidad) {
-        return ResponseEntity.ok(financierosReportService.obtenerIngresosPorPeriodo(fechaDesde, fechaHasta, granularidad));
+            @RequestParam(required = false) String granularidad,
+            @RequestParam(required = false) Long usuarioId) {
+        return ResponseEntity.ok(financierosReportService.obtenerIngresosPorPeriodo(fechaDesde, fechaHasta, granularidad, usuarioId));
     }
 
     @GetMapping("/promedios")
     public ResponseEntity<ReporteFinancieroResponseDTO> promediosFinancieros(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaDesde,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta) {
-        return ResponseEntity.ok(financierosReportService.obtenerPromediosFinancieros(fechaDesde, fechaHasta));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta,
+            @RequestParam(required = false) Long usuarioId) {
+        return ResponseEntity.ok(financierosReportService.obtenerPromediosFinancieros(fechaDesde, fechaHasta, usuarioId));
     }
 
     @GetMapping("/ingresos-por-tipo-vehiculo")
     public ResponseEntity<ReporteTablaResponseDTO> ingresosPorTipoVehiculo(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaDesde,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta) {
-        return ResponseEntity.ok(financierosReportService.obtenerIngresosPorTipoVehiculo(fechaDesde, fechaHasta));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta,
+            @RequestParam(required = false) Long usuarioId) {
+        return ResponseEntity.ok(financierosReportService.obtenerIngresosPorTipoVehiculo(fechaDesde, fechaHasta, usuarioId));
     }
 
     @GetMapping("/ingresos-por-metodo-pago")
     public ResponseEntity<ReporteTablaResponseDTO> ingresosPorMetodoPago(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaDesde,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta) {
-        return ResponseEntity.ok(financierosReportService.obtenerIngresosPorMetodoPago(fechaDesde, fechaHasta));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta,
+            @RequestParam(required = false) Long usuarioId) {
+        return ResponseEntity.ok(financierosReportService.obtenerIngresosPorMetodoPago(fechaDesde, fechaHasta, usuarioId));
     }
 
     @GetMapping("/ranking-horas-pico")
     public ResponseEntity<ReporteTopNResponseDTO> rankingHorasPicoPorIngreso(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaDesde,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta,
-            @RequestParam(required = false) Integer limite) {
-        return ResponseEntity.ok(financierosReportService.obtenerRankingHorasPicoPorIngreso(fechaDesde, fechaHasta, limite));
+            @RequestParam(required = false) Integer limite,
+            @RequestParam(required = false) Long usuarioId) {
+        return ResponseEntity.ok(financierosReportService.obtenerRankingHorasPicoPorIngreso(fechaDesde, fechaHasta, limite, usuarioId));
     }
 }
