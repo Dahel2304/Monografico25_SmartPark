@@ -193,12 +193,19 @@ public class ConsultasReportService {
             OffsetDateTime fechaDesde,
             OffsetDateTime fechaHasta,
             Integer page,
-            Integer size) {
+            Integer size,
+            Integer piso) {
         RangoFechas rango = commonService.resolverRango(fechaDesde, fechaHasta, MAX_RANGE_DIAS);
 
         List<Ticket> tickets = ticketRepository.findAllByHoraEntradaGreaterThanEqualAndHoraEntradaLessThan(
                 rango.fechaDesde(),
                 rango.fechaHasta()).stream()
+                                .filter(ticket -> {
+                                        if (piso == null) return true;
+                                        if (ticket.getEspacio() == null) return false;
+                                        int pisoTicket = ticket.getEspacio().getPiso() == null ? 1 : ticket.getEspacio().getPiso();
+                                        return pisoTicket == piso;
+                                })
                 .sorted((a, b) -> {
                     LocalDateTime fa = a.getHoraEntrada() == null ? LocalDateTime.MIN : a.getHoraEntrada();
                     LocalDateTime fb = b.getHoraEntrada() == null ? LocalDateTime.MIN : b.getHoraEntrada();
@@ -206,12 +213,13 @@ public class ConsultasReportService {
                 })
                 .toList();
 
-        List<String> columnas = List.of("codigoTicket", "placa", "tipoVehiculo", "codigoEspacio", "estado", "horaEntrada", "horaSalida", "montoTotal");
+                List<String> columnas = List.of("codigoTicket", "placa", "tipoVehiculo", "piso", "codigoEspacio", "estado", "horaEntrada", "horaSalida", "montoTotal");
         List<ReporteTablaFilaDTO> filas = tickets.stream().map(ticket -> {
             Map<String, String> row = new LinkedHashMap<>();
             row.put("codigoTicket", ticket.getCodigoTicket());
             row.put("placa", ticket.getPlaca());
             row.put("tipoVehiculo", ticket.getTipoVehiculo() == null ? "-" : ticket.getTipoVehiculo().getNombre());
+                        row.put("piso", String.valueOf(ticket.getEspacio() == null || ticket.getEspacio().getPiso() == null ? 1 : ticket.getEspacio().getPiso()));
             row.put("codigoEspacio", ticket.getEspacio() == null ? "-" : ticket.getEspacio().getCodigoEspacio());
             row.put("estado", ticket.getEstado() == null ? "-" : ticket.getEstado().getNombre());
             row.put("horaEntrada", commonService.formatDateTime(ticket.getHoraEntrada()));

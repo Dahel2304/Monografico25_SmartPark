@@ -1,5 +1,7 @@
 package com.parking.service;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,11 +26,15 @@ import com.parking.dto.ReservaActivaDTO;
 import com.parking.dto.TicketActivoDTO;
 import com.parking.entity.Espacio;
 import com.parking.entity.EstadoEspacio;
+import com.parking.entity.EstadoReserva;
+import com.parking.entity.EstadoTicket;
 import com.parking.entity.Reserva;
 import com.parking.entity.Ticket;
 import com.parking.entity.TipoVehiculo;
 import com.parking.repository.EspacioRepository;
 import com.parking.repository.EstadoEspacioRepository;
+import com.parking.repository.EstadoReservaRepository;
+import com.parking.repository.EstadoTicketRepository;
 import com.parking.repository.ReservaRepository;
 import com.parking.repository.TicketRepository;
 import com.parking.repository.TipoVehiculoRepository;
@@ -42,23 +48,33 @@ public class EspacioService {
     private static final int CAPACIDAD_MOTO = 10;
     private static final String ESTADO_LIBRE = "libre";
     private static final String ESTADO_TICKET_ACTIVO = "activo";
+    private static final String ESTADO_TICKET_CERRADO = "cerrado";
     private static final String ESTADO_RESERVA_PENDIENTE = "pendiente";
+    private static final String ESTADO_RESERVA_ACTIVA = "activa";
+    private static final String ESTADO_RESERVA_FINALIZADA = "finalizada";
     private static final DateTimeFormatter HORA_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     private final EspacioRepository espacioRepository;
     private final TicketRepository ticketRepository;
     private final ReservaRepository reservaRepository;
+    private final EstadoReservaRepository estadoReservaRepository;
+    private final EstadoTicketRepository estadoTicketRepository;
     private final TipoVehiculoRepository tipoVehiculoRepository;
     private final EstadoEspacioRepository estadoEspacioRepository;
+    private final Clock appClock;
 
     public EspacioService(EspacioRepository espacioRepository, TicketRepository ticketRepository,
-            ReservaRepository reservaRepository, TipoVehiculoRepository tipoVehiculoRepository,
-            EstadoEspacioRepository estadoEspacioRepository) {
+            ReservaRepository reservaRepository, EstadoReservaRepository estadoReservaRepository,
+            EstadoTicketRepository estadoTicketRepository, TipoVehiculoRepository tipoVehiculoRepository,
+            EstadoEspacioRepository estadoEspacioRepository, Clock appClock) {
         this.espacioRepository = espacioRepository;
         this.ticketRepository = ticketRepository;
         this.reservaRepository = reservaRepository;
+        this.estadoReservaRepository = estadoReservaRepository;
+        this.estadoTicketRepository = estadoTicketRepository;
         this.tipoVehiculoRepository = tipoVehiculoRepository;
         this.estadoEspacioRepository = estadoEspacioRepository;
+        this.appClock = appClock;
     }
 
     @Transactional
@@ -93,8 +109,10 @@ public class EspacioService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<EspacioResponseDTO> listarEspacios() {
+
+        cerrarTicketsDeEspaciosLibres();
 
         List<Espacio> espacios = espacioRepository.findAllByActivoTrueOrderByIdAsc();
         if (espacios.isEmpty()) {
@@ -259,6 +277,46 @@ public class EspacioService {
         }
         return ticketPorEspacio;
     }
+
+        private void cerrarTicketsDeEspaciosLibres() {
+        List<Long> espaciosLibresIds = espacioRepository.findAllByActivoTrueOrderByIdAsc().stream()
+            .filter(espacio -> espacio.getEstado() != null
+                && ESTADO_LIBRE.equalsIgnoreCase(espacio.getEstado().getNombre()))
+            .map(Espacio::getId)
+            .toList();
+        if (espaciosLibresIds.isEmpty()) {
+            return;
+        }
+
+        List<Ticket> ticketsHuerfanos = ticketRepository
+            .findAllByEspacioIdInAndEstadoNombreIgnoreCaseOrderByHoraEntradaDesc(
+                espaciosLibresIds, ESTADO_TICKET_ACTIVO);
+        if (ticketsHuerfanos.isEmpty()) {
+            return;
+        }
+
+        EstadoTicket estadoCerrado = estadoTicketRepository.findByNombreIgnoreCase(ESTADO_TICKET_CERRADO)
+            .orElseThrow(() -> new NoSuchElementException("Estado de ticket CERRADO no encontrado"));
+        EstadoReserva estadoFinalizada = estadoReservaRepository.findByNombreIgnoreCase(ESTADO_RESERVA_FINALIZADA)
+            .orElseThrow(() -> new NoSuchElementException("Estado de reserva FINALIZADA no encontrado"));
+        LocalDateTime horaSalida = LocalDateTime.now(appClock);
+
+        for (Ticket ticket : ticketsHuerfanos) {
+            ticket.setHoraSalida(horaSalida);
+            ticket.setEstado(estadoCerrado);
+
+            reservaRepository
+                .findTopByEspacioIdAndPlacaIgnoreCaseAndEstadoNombreIgnoreCaseOrderByHoraInicioDesc(
+                    ticket.getEspacio().getId(), ticket.getPlaca(), ESTADO_RESERVA_ACTIVA)
+                .ifPresent(reserva -> {
+                reserva.setEstado(estadoFinalizada);
+                reserva.setHoraFin(horaSalida);
+                reservaRepository.save(reserva);
+                });
+        }
+
+        ticketRepository.saveAll(ticketsHuerfanos);
+        }
 
     private Map<Long, Reserva> obtenerReservasPendientesPorEspacio(List<Long> espacioIds) {
         List<Reserva> reservasPendientes = reservaRepository

@@ -56,13 +56,14 @@ public class OcupacionReportService {
                 .filter(ticket -> ticket.getEspacio() != null && ticket.getEspacio().getId() != null)
                 .collect(Collectors.groupingBy(ticket -> ticket.getEspacio().getId(), Collectors.counting()));
 
-        List<String> columnas = List.of("codigoEspacio", "tipoVehiculo", "estadoActual", "activo", "usosEnRango");
+        List<String> columnas = List.of("piso", "codigoEspacio", "tipoVehiculo", "estadoActual", "activo", "usosEnRango");
         List<ReporteTablaFilaDTO> filas = espacios.stream()
                 .sorted(Comparator
                         .comparing((Espacio espacio) -> usoPorEspacioId.getOrDefault(espacio.getId(), 0L), Comparator.reverseOrder())
                         .thenComparing(Espacio::getCodigoEspacio, Comparator.nullsLast(String::compareToIgnoreCase)))
                 .map(espacio -> {
                     Map<String, String> row = new LinkedHashMap<>();
+                    row.put("piso", String.valueOf(espacio.getPiso() == null ? 1 : espacio.getPiso()));
                     row.put("codigoEspacio", espacio.getCodigoEspacio());
                     row.put("tipoVehiculo", espacio.getTipoVehiculo() == null ? "-" : espacio.getTipoVehiculo().getNombre());
                     row.put("estadoActual", espacio.getEstado() == null ? "-" : espacio.getEstado().getNombre());
@@ -140,23 +141,73 @@ public class OcupacionReportService {
                 (long) filas.size());
     }
 
+    @Transactional(readOnly = true)
+    public ReporteTablaResponseDTO obtenerTendenciaUsoPorPiso(
+            OffsetDateTime fechaDesde,
+            OffsetDateTime fechaHasta,
+            String granularidad) {
+        RangoFechas rango = commonService.resolverRango(fechaDesde, fechaHasta, MAX_RANGE_DIAS);
+        String granularidadNormalizada = normalizarGranularidad(granularidad);
+
+        List<Ticket> tickets = ticketRepository.findAllByHoraEntradaGreaterThanEqualAndHoraEntradaLessThan(
+                rango.fechaDesde(),
+                rango.fechaHasta()).stream()
+                .filter(ticket -> !esTicketAnulado(ticket))
+                .filter(ticket -> ticket.getHoraEntrada() != null)
+                .filter(ticket -> ticket.getEspacio() != null)
+                .toList();
+
+        List<String> pisos = espacioRepository.findAll().stream()
+                .map(espacio -> "Piso " + (espacio.getPiso() == null ? 1 : espacio.getPiso()))
+                .distinct()
+                .sorted(Comparator.comparingInt(piso -> Integer.parseInt(piso.substring(5))))
+                .toList();
+
+        Map<String, Map<String, Long>> usosPorPeriodoYPiso = tickets.stream()
+                .collect(Collectors.groupingBy(
+                        ticket -> construirEtiquetaPeriodo(ticket.getHoraEntrada(), granularidadNormalizada),
+                        Collectors.groupingBy(
+                                ticket -> "Piso " + (ticket.getEspacio().getPiso() == null ? 1 : ticket.getEspacio().getPiso()),
+                                Collectors.counting())));
+
+        List<String> periodos = usosPorPeriodoYPiso.keySet().stream()
+                .sorted()
+                .toList();
+        List<String> columnas = List.of("periodo", "piso", "usos");
+        List<ReporteTablaFilaDTO> filas = periodos.stream()
+                .flatMap(periodo -> pisos.stream().map(piso -> {
+                    Map<String, String> row = new LinkedHashMap<>();
+                    row.put("periodo", periodo);
+                    row.put("piso", piso);
+                    row.put("usos", String.valueOf(
+                            usosPorPeriodoYPiso.getOrDefault(periodo, java.util.Collections.emptyMap())
+                                    .getOrDefault(piso, 0L)));
+                    return new ReporteTablaFilaDTO(row);
+                }))
+                .toList();
+
+        return new ReporteTablaResponseDTO(
+                "Tendencia de uso por piso",
+                columnas,
+                filas,
+                (long) filas.size());
+    }
+
     private String normalizarGranularidad(String granularidad) {
         String value = commonService.normalizarTexto(granularidad).toLowerCase(Locale.ROOT);
         if (value.isBlank()) {
             return "dia";
         }
-        if (value.equals("hora")) {
-            return "dia";
-        }
-        if (value.equals("dia") || value.equals("semana") || value.equals("mes")) {
+                if (value.equals("hora") || value.equals("dia") || value.equals("semana") || value.equals("mes")) {
             return value;
         }
-        throw new IllegalArgumentException("granularidad invalida. Use: dia, semana o mes");
+                throw new IllegalArgumentException("granularidad invalida. Use: hora, dia, semana o mes");
     }
 
     private String construirEtiquetaPeriodo(LocalDateTime fechaHora, String granularidad) {
         return switch (granularidad) {
             case "mes" -> String.format("%04d-%02d", fechaHora.getYear(), fechaHora.getMonthValue());
+                        case "hora" -> String.format("%02d:00", fechaHora.getHour());
             case "semana" -> {
                 WeekFields wf = WeekFields.ISO;
                 int week = fechaHora.get(wf.weekOfWeekBasedYear());

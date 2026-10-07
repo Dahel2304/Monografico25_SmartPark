@@ -41,8 +41,9 @@ public class ReportesConsultasController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaDesde,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size) {
-        return ResponseEntity.ok(consultasReportService.obtenerListadoTicketsPorFecha(fechaDesde, fechaHasta, page, size));
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) Integer piso) {
+        return ResponseEntity.ok(consultasReportService.obtenerListadoTicketsPorFecha(fechaDesde, fechaHasta, page, size, piso));
     }
 
     @GetMapping("/reserva/{codigoReserva}")

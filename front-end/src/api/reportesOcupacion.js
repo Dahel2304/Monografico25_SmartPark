@@ -14,3 +14,10 @@ export const getTendenciaUsoPorEspacio = async (params = {}) => {
   });
   return data;
 };
+
+export const getTendenciaUsoPorPiso = async (params = {}) => {
+  const { data } = await client.get("/reportes/ocupacion/tendencia-uso-piso", {
+    params: buildParams(params),
+  });
+  return data;
+};
