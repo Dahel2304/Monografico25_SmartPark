@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { Loader2, Search } from "lucide-react";
 
@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from "../../components/ui/dialog";
 import { Input } from "../../components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import {
   Table,
@@ -112,6 +113,7 @@ const getColumnLabel = (columnName) => {
     estadoTicket: "Estado ticket",
     estadoPago: "Estado pago",
     tipoVehiculo: "Tipo de vehículo",
+    piso: "Piso",
     codigoEspacio: "Espacio",
     horaEntrada: "Hora entrada",
     horaSalida: "Hora salida",
@@ -249,6 +251,7 @@ export const ReportesConsultasPage = () => {
   const [fechaDesde, setFechaDesde] = useState(startOfTodayInput());
   const [fechaHasta, setFechaHasta] = useState(nowInput());
   const [seccionActiva, setSeccionActiva] = useState("tickets");
+  const [pisoTicket, setPisoTicket] = useState("TODOS");
 
   const [ticketsPage, setTicketsPage] = useState(0);
   const [pagosPage, setPagosPage] = useState(0);
@@ -296,7 +299,12 @@ export const ReportesConsultasPage = () => {
   const cargarTicketsListado = async (page = 0) => {
     try {
       setLoadingTickets(true);
-      const data = await getConsultasTicketsPorFecha({ ...baseParams, page, size: PAGE_SIZE });
+      const data = await getConsultasTicketsPorFecha({
+        ...baseParams,
+        page,
+        size: PAGE_SIZE,
+        piso: pisoTicket === "TODOS" ? undefined : Number(pisoTicket),
+      });
       setTicketsListado(toTablaPrincipalResponse(data));
       setTicketsPage(page);
       setTicketBusquedaActiva(false);
@@ -501,14 +509,25 @@ export const ReportesConsultasPage = () => {
     return cargarVehiculosListado(vehiculosPage);
   };
 
+  const recargarSeccionActiva = useEffectEvent(() => {
+    if (seccionActiva === "tickets") {
+      setTicketsPage(0);
+      cargarTicketsListado(0);
+      return;
+    }
+    cargarSeccionActiva();
+  });
+
   const limpiarFiltrosContexto = () => {
     setFechaDesde(startOfTodayInput());
     setFechaHasta(nowInput());
+    setPisoTicket("TODOS");
+    setTicketsPage(0);
   };
 
   useEffect(() => {
-    cargarSeccionActiva();
-  }, [seccionActiva]);
+    recargarSeccionActiva();
+  }, [seccionActiva, pisoTicket]);
 
   const loading = loadingTickets || loadingPagos || loadingReservas || loadingVehiculos || loadingDetalle || loadingAnulacion || loadingAnulacionPago;
 
@@ -615,8 +634,31 @@ export const ReportesConsultasPage = () => {
 
         <TabsContent value="tickets" className="space-y-3">
           <div className="reportes-panel space-y-2.5">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-end justify-between gap-3">
               <h2 className="text-sm font-semibold">Tickets</h2>
+              <div className="w-full space-y-1 sm:w-48">
+                <label className="reportes-field-label">Filtrar por piso</label>
+                <Select
+                  value={pisoTicket}
+                  onValueChange={(value) => {
+                    setPisoTicket(value);
+                    setTicketsPage(0);
+                    setTicketBusquedaActiva(false);
+                  }}
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="Selecciona un piso" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="TODOS">Todos los pisos</SelectItem>
+                    {Array.from({ length: 10 }, (_, index) => index + 1).map((piso) => (
+                      <SelectItem key={piso} value={String(piso)}>
+                        Piso {piso}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {renderBusquedaCodigo({

@@ -111,6 +111,15 @@ export const DashboardPage = () => {
 
   useEffect(() => {
     fetchDashboard(true);
+
+    const refreshDashboard = () => fetchDashboard(false);
+    const intervalId = window.setInterval(refreshDashboard, 30000);
+    window.addEventListener("focus", refreshDashboard);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshDashboard);
+    };
   }, []);
 
   const metrics = useMemo(() => {
@@ -165,6 +174,18 @@ export const DashboardPage = () => {
       .filter((reserva) => {
         const timestamp = new Date(reserva.horaInicio).getTime();
         return !Number.isNaN(timestamp) && timestamp >= now && timestamp <= thirtyMinutesAhead;
+      })
+      .sort((a, b) => new Date(a.horaInicio).getTime() - new Date(b.horaInicio).getTime());
+  }, [reservas]);
+
+  const reservasPendientesFuturas = useMemo(() => {
+    const now = Date.now();
+
+    return reservas
+      .filter((reserva) => (reserva.estado || "").toUpperCase() === "PENDIENTE")
+      .filter((reserva) => {
+        const timestamp = new Date(reserva.horaInicio).getTime();
+        return !Number.isNaN(timestamp) && timestamp >= now;
       })
       .sort((a, b) => new Date(a.horaInicio).getTime() - new Date(b.horaInicio).getTime());
   }, [reservas]);
@@ -256,7 +277,7 @@ export const DashboardPage = () => {
     const totalSalidas = lineChartData.reduce((sum, item) => sum + Number(item.salidas || 0), 0);
     const flujoNeto = totalEntradas - totalSalidas;
 
-    const proximaReserva = reservasPendientesProximas[0] || null;
+    const proximaReserva = reservasPendientesFuturas[0] || null;
     const estadiaMasLarga = estadiasLargas[0] || null;
 
     return {
@@ -264,7 +285,7 @@ export const DashboardPage = () => {
       proximaReserva,
       estadiaMasLarga
     };
-  }, [lineChartData, reservasPendientesProximas, estadiasLargas]);
+  }, [lineChartData, reservasPendientesFuturas, estadiasLargas]);
 
   return (
     <div className="space-y-3 max-w-6xl">
@@ -430,7 +451,7 @@ export const DashboardPage = () => {
                     {formatDateTime(estadoRapido.proximaReserva.horaInicio)} · {estadoRapido.proximaReserva.placa || "-"}
                   </p>
                 ) : (
-                  <p className="font-medium">Sin reservas proximas</p>
+                  <p className="font-medium">Sin reservas futuras</p>
                 )}
               </div>
 

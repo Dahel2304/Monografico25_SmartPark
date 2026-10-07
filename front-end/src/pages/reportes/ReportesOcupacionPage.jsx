@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
+  Cell,
   Legend,
   Line,
   LineChart,
@@ -13,6 +16,7 @@ import {
 
 import {
   getTendenciaUsoPorEspacio,
+  getTendenciaUsoPorPiso,
   getUtilizacionPorEspacio,
 } from "../../api/reportesOcupacion";
 import { toApiOffsetDateTime } from "../../api/reportesCommon";
@@ -61,6 +65,7 @@ export const ReportesOcupacionPage = () => {
 
   const [utilizacionRows, setUtilizacionRows] = useState([]);
   const [tendenciaRows, setTendenciaRows] = useState([]);
+  const [tendenciaPisoRows, setTendenciaPisoRows] = useState([]);
 
   const cargarDatos = async () => {
     try {
@@ -77,17 +82,19 @@ export const ReportesOcupacionPage = () => {
         fechaHasta: toApiOffsetDateTime(fechaHasta),
       };
 
-      const [utilizacionResp, tendenciaResp] = await Promise.all([
+      const [utilizacionResp, tendenciaResp, tendenciaPisoResp] = await Promise.all([
         getUtilizacionPorEspacio(paramsRango),
         getTendenciaUsoPorEspacio({
           ...paramsRango,
           granularidad,
           limiteEspacios: 8,
         }),
+        getTendenciaUsoPorPiso({ ...paramsRango, granularidad }),
       ]);
 
       setUtilizacionRows(Array.isArray(utilizacionResp?.filas) ? utilizacionResp.filas : []);
       setTendenciaRows(Array.isArray(tendenciaResp?.filas) ? tendenciaResp.filas : []);
+      setTendenciaPisoRows(Array.isArray(tendenciaPisoResp?.filas) ? tendenciaPisoResp.filas : []);
     } catch (error) {
       const message = await getReportesErrorMessage(error, "No se pudieron cargar los reportes de ocupacion");
       setErrorMessage(message);
@@ -164,6 +171,49 @@ export const ReportesOcupacionPage = () => {
     });
   }, [tendenciaRows, tendenciaSeries]);
 
+  const pisoRanking = useMemo(() => {
+    const totals = new Map();
+    utilizacionRows.forEach((fila) => {
+      const columnas = fila?.columnas || {};
+      const piso = `Piso ${columnas.piso || 1}`;
+      const actual = totals.get(piso) || { piso, usos: 0, espaciosConUso: 0, espaciosActivos: 0 };
+      const usos = toNumber(columnas.usosEnRango);
+      actual.usos += usos;
+      actual.espaciosConUso += usos > 0 ? 1 : 0;
+      actual.espaciosActivos += String(columnas.activo || "").toUpperCase() === "SI" ? 1 : 0;
+      totals.set(piso, actual);
+    });
+
+    return Array.from(totals.values()).sort((a, b) =>
+      b.usos - a.usos || Number(a.piso.slice(5)) - Number(b.piso.slice(5))
+    );
+  }, [utilizacionRows]);
+
+  const tendenciaPisoSeries = useMemo(() => {
+    const pisos = new Set(tendenciaPisoRows.map((fila) => fila?.columnas?.piso).filter(Boolean));
+    return Array.from(pisos).sort((a, b) => Number(a.slice(5)) - Number(b.slice(5)));
+  }, [tendenciaPisoRows]);
+
+  const tendenciaPisoChartData = useMemo(() => {
+    const periodos = [...new Set(tendenciaPisoRows.map((fila) => fila?.columnas?.periodo).filter(Boolean))].sort();
+    const usoLookup = new Map();
+
+    tendenciaPisoRows.forEach((fila) => {
+      const columnas = fila?.columnas || {};
+      if (columnas.periodo && columnas.piso) {
+        usoLookup.set(`${columnas.periodo}|${columnas.piso}`, toNumber(columnas.usos));
+      }
+    });
+
+    return periodos.map((periodo) => {
+      const row = { periodo };
+      tendenciaPisoSeries.forEach((piso) => {
+        row[piso] = usoLookup.get(`${periodo}|${piso}`) || 0;
+      });
+      return row;
+    });
+  }, [tendenciaPisoRows, tendenciaPisoSeries]);
+
   const limpiarFiltros = () => {
     setFechaDesde(startOfTodayInput());
     setFechaHasta(nowInput());
@@ -196,7 +246,7 @@ export const ReportesOcupacionPage = () => {
         onRetry={cargarDatos}
       />
 
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
         <div className="reportes-kpi">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Ocupacion global</p>
           <p className="text-lg font-semibold text-primary">{resumen.ocupacionPorcentaje.toFixed(2)}%</p>
@@ -225,6 +275,95 @@ export const ReportesOcupacionPage = () => {
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Capacidad inactiva</p>
           <p className="text-lg font-semibold">{resumen.capacidadInactiva}</p>
         </div>
+        <div className="reportes-kpi">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Piso con más entradas</p>
+          <p className="text-lg font-semibold">{pisoRanking.find((piso) => piso.usos > 0)?.piso || "-"}</p>
+          <p className="text-xs text-muted-foreground">{pisoRanking.find((piso) => piso.usos > 0)?.usos || 0} en el rango</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="reportes-panel">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">Tendencia de entradas por piso</h2>
+            <span className="text-xs text-muted-foreground">Agrupado por {granularidad}</span>
+          </div>
+          {!tendenciaPisoChartData.length ? (
+            <div className="flex h-72 items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
+              No hay entradas por piso en el rango seleccionado.
+            </div>
+          ) : (
+            <div className="h-72 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                {tendenciaPisoChartData.length === 1 ? (
+                  <BarChart data={tendenciaPisoChartData} margin={{ top: 12, right: 10, bottom: 4, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+                    <XAxis dataKey="periodo" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={30} />
+                    <Tooltip />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    {tendenciaPisoSeries.map((piso, index) => (
+                      <Bar
+                        key={piso}
+                        dataKey={piso}
+                        name={piso}
+                        fill={LINE_COLORS[index % LINE_COLORS.length]}
+                        radius={[3, 3, 0, 0]}
+                      />
+                    ))}
+                  </BarChart>
+                ) : (
+                  <LineChart data={tendenciaPisoChartData} margin={{ top: 12, right: 10, bottom: 4, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+                    <XAxis dataKey="periodo" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={30} />
+                    <Tooltip />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    {tendenciaPisoSeries.map((piso, index) => (
+                      <Line
+                        key={piso}
+                        type="monotone"
+                        dataKey={piso}
+                        name={piso}
+                        stroke={LINE_COLORS[index % LINE_COLORS.length]}
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                      />
+                    ))}
+                  </LineChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        <div className="reportes-panel">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">Entradas por piso</h2>
+            <span className="text-xs text-muted-foreground">Piso con más uso primero</span>
+          </div>
+          {!pisoRanking.length ? (
+            <div className="flex h-72 items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
+              No hay espacios para comparar.
+            </div>
+          ) : (
+            <div className="h-72 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={pisoRanking} margin={{ top: 12, right: 10, bottom: 4, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+                  <XAxis dataKey="piso" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={30} />
+                  <Tooltip />
+                  <Bar dataKey="usos" name="Entradas en rango" radius={[3, 3, 0, 0]}>
+                    {pisoRanking.map((piso, index) => (
+                      <Cell key={piso.piso} fill={LINE_COLORS[index % LINE_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="reportes-panel">
@@ -240,24 +379,43 @@ export const ReportesOcupacionPage = () => {
         ) : (
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={tendenciaChartData} margin={{ top: 12, right: 10, bottom: 4, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
-                <XAxis dataKey="periodo" tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={30} />
-                <Tooltip />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                {tendenciaSeries.map((codigoEspacio, index) => (
-                  <Line
-                    key={codigoEspacio}
-                    type="monotone"
-                    dataKey={codigoEspacio}
-                    name={codigoEspacio}
-                    stroke={LINE_COLORS[index % LINE_COLORS.length]}
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                ))}
-              </LineChart>
+              {tendenciaChartData.length === 1 ? (
+                <BarChart data={tendenciaChartData} margin={{ top: 12, right: 10, bottom: 4, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+                  <XAxis dataKey="periodo" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={30} />
+                  <Tooltip />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  {tendenciaSeries.map((codigoEspacio, index) => (
+                    <Bar
+                      key={codigoEspacio}
+                      dataKey={codigoEspacio}
+                      name={codigoEspacio}
+                      fill={LINE_COLORS[index % LINE_COLORS.length]}
+                      radius={[3, 3, 0, 0]}
+                    />
+                  ))}
+                </BarChart>
+              ) : (
+                <LineChart data={tendenciaChartData} margin={{ top: 12, right: 10, bottom: 4, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+                  <XAxis dataKey="periodo" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={30} />
+                  <Tooltip />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  {tendenciaSeries.map((codigoEspacio, index) => (
+                    <Line
+                      key={codigoEspacio}
+                      type="monotone"
+                      dataKey={codigoEspacio}
+                      name={codigoEspacio}
+                      stroke={LINE_COLORS[index % LINE_COLORS.length]}
+                      strokeWidth={2}
+                      dot={{ r: 4 }}
+                    />
+                  ))}
+                </LineChart>
+              )}
             </ResponsiveContainer>
           </div>
         )}
@@ -272,6 +430,7 @@ export const ReportesOcupacionPage = () => {
         <Table className="reportes-table">
           <TableHeader>
             <TableRow>
+                <TableHead className="h-9 px-2">Piso</TableHead>
               <TableHead className="h-9 px-2">Espacio</TableHead>
               <TableHead className="h-9 px-2">Tipo</TableHead>
               <TableHead className="h-9 px-2">Estado</TableHead>
@@ -282,7 +441,7 @@ export const ReportesOcupacionPage = () => {
           <TableBody>
             {!utilizacionRows.length ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-6 text-center text-xs text-muted-foreground">
+                <TableCell colSpan={6} className="py-6 text-center text-xs text-muted-foreground">
                   No hay datos de utilizacion para el rango seleccionado.
                 </TableCell>
               </TableRow>
@@ -291,6 +450,7 @@ export const ReportesOcupacionPage = () => {
                 const c = fila?.columnas || {};
                 return (
                   <TableRow key={`${c.codigoEspacio || "espacio"}-${idx}`}>
+                    <TableCell className="px-2 py-2">Piso {c.piso || 1}</TableCell>
                     <TableCell className="px-2 py-2 font-medium">{c.codigoEspacio || "-"}</TableCell>
                     <TableCell className="px-2 py-2">{c.tipoVehiculo || "-"}</TableCell>
                     <TableCell className="px-2 py-2">{c.estadoActual || "-"}</TableCell>

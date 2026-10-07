@@ -25,6 +25,7 @@ import com.parking.repository.EspacioRepository;
 import com.parking.repository.EstadoEspacioRepository;
 import com.parking.repository.EstadoReservaRepository;
 import com.parking.repository.ReservaRepository;
+import com.parking.repository.TicketRepository;
 import com.parking.repository.TipoVehiculoRepository;
 import com.parking.repository.UsuarioRepository;
 
@@ -32,12 +33,12 @@ import com.parking.repository.UsuarioRepository;
 public class ReservaService {
 
     private static final String ESTADO_PENDIENTE = "PENDIENTE";
-    private static final String ESTADO_ACTIVA = "ACTIVA";
     private static final String ESTADO_CANCELADA = "CANCELADA";
     private static final String ESTADO_ESPACIO_LIBRE = "LIBRE";
     private static final String ESTADO_ESPACIO_RESERVADO = "RESERVADO";
 
     private final ReservaRepository reservaRepository;
+    private final TicketRepository ticketRepository;
     private final EstadoReservaRepository estadoReservaRepository;
     private final EspacioRepository espacioRepository;
     private final EstadoEspacioRepository estadoEspacioRepository;
@@ -46,6 +47,7 @@ public class ReservaService {
     private final Clock appClock;
 
     public ReservaService(ReservaRepository reservaRepository,
+            TicketRepository ticketRepository,
             EstadoReservaRepository estadoReservaRepository,
             EspacioRepository espacioRepository,
             EstadoEspacioRepository estadoEspacioRepository,
@@ -53,6 +55,7 @@ public class ReservaService {
             UsuarioRepository usuarioRepository,
             Clock appClock) {
         this.reservaRepository = reservaRepository;
+        this.ticketRepository = ticketRepository;
         this.estadoReservaRepository = estadoReservaRepository;
         this.espacioRepository = espacioRepository;
         this.estadoEspacioRepository = estadoEspacioRepository;
@@ -127,8 +130,8 @@ public class ReservaService {
                 .orElseThrow(() -> new NoSuchElementException("Reserva no encontrada"));
 
         String estadoActual = normalize(reserva.getEstado().getNombre()).toUpperCase(Locale.ROOT);
-        if (!ESTADO_PENDIENTE.equals(estadoActual) && !ESTADO_ACTIVA.equals(estadoActual)) {
-            throw new IllegalStateException("Solo se puede cancelar una reserva en estado PENDIENTE o ACTIVA");
+        if (!ESTADO_PENDIENTE.equals(estadoActual)) {
+            throw new IllegalStateException("Solo se pueden cancelar reservas en estado PENDIENTE");
         }
 
         EstadoReserva estadoCancelada = estadoReservaRepository.findByNombreIgnoreCase(ESTADO_CANCELADA)
@@ -187,6 +190,8 @@ public class ReservaService {
                 reserva.getClienteTelefono(),
                 reserva.getClienteEmail(),
             reserva.getCorreoEnviado(),
-                reserva.getFechaCreacion());
+                reserva.getFechaCreacion(),
+                ticketRepository.existsByEspacioIdAndPlacaIgnoreCaseAndEstadoNombreIgnoreCase(
+                        reserva.getEspacio().getId(), reserva.getPlaca(), "ACTIVO"));
     }
 }

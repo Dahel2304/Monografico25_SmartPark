@@ -196,9 +196,9 @@ export default function ListaReservas({ refresh }) {
       const estado = (reserva.estado || "").toUpperCase();
       if (estado === "PENDIENTE") {
         base.pendientes += 1;
-      } else if (estado === "ACTIVA") {
+      } else if (estado === "ACTIVA" && reserva.vehiculoEnEspacio) {
         base.activas += 1;
-      } else if (ESTADOS_HISTORIAL.includes(estado)) {
+      } else if (ESTADOS_HISTORIAL.includes(estado) || estado === "ACTIVA") {
         base.historial += 1;
       }
     });
@@ -231,10 +231,11 @@ export default function ListaReservas({ refresh }) {
     }
 
     if (filtro === "activas") {
-      return estado === "ACTIVA";
+      return estado === "ACTIVA" && reserva.vehiculoEnEspacio;
     }
 
-    return ESTADOS_HISTORIAL.includes(estado);
+    return ESTADOS_HISTORIAL.includes(estado)
+      || (estado === "ACTIVA" && !reserva.vehiculoEnEspacio);
   });
 
   return (
@@ -371,7 +372,7 @@ export default function ListaReservas({ refresh }) {
 
                 <TableCell className="space-x-2 whitespace-nowrap">
 
-                  {(filtro === "pendientes" || filtro === "activas") && (
+                  {filtro === "pendientes" && (
                     <Button
                       size="sm"
                       disabled={procesandoCodigo === reserva.codigoReserva}
@@ -381,7 +382,7 @@ export default function ListaReservas({ refresh }) {
                     </Button>
                   )}
 
-                  {(filtro === "pendientes" || filtro === "activas") && (
+                  {filtro === "pendientes" && (
                     <Button
                       size="sm"
                       variant="destructive"

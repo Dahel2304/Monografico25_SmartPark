@@ -27,4 +27,5 @@ public class ReservaResponseDTO {
     private String clienteEmail;
     private Boolean correoEnviado;
     private LocalDateTime fechaCreacion;
+    private boolean vehiculoEnEspacio;
 }

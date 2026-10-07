@@ -37,4 +37,12 @@ public class ReportesOcupacionController {
             @RequestParam(required = false) Integer limiteEspacios) {
         return ResponseEntity.ok(ocupacionReportService.obtenerTendenciaUsoPorEspacio(fechaDesde, fechaHasta, granularidad, limiteEspacios));
     }
+
+    @GetMapping("/tendencia-uso-piso")
+    public ResponseEntity<ReporteTablaResponseDTO> tendenciaUsoPorPiso(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime fechaHasta,
+            @RequestParam(required = false) String granularidad) {
+        return ResponseEntity.ok(ocupacionReportService.obtenerTendenciaUsoPorPiso(fechaDesde, fechaHasta, granularidad));
+    }
 }
